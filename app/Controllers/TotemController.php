@@ -328,9 +328,17 @@ class TotemController extends Controller
             'items'          => $items,
         ];
 
-        // Responde imediatamente ao totem e envia notificações em segundo plano,
-        // para que SMTP/webhook lentos não travem a confirmação da reserva.
-        $this->jsonThenContinue([
+        // Notificações (e-mail + webhook) de forma síncrona — mesmo caminho do
+        // teste de SMTP, que já funciona. Falhas são registradas no log e não
+        // impedem a confirmação (cada envio tem timeout curto).
+        try {
+            $notifier = new NotificationService();
+            $notifier->notifyReservation($notificationData);
+        } catch (\Throwable $e) {
+            error_log('[TotemController] Falha ao notificar reserva: ' . $e->getMessage());
+        }
+
+        $this->json([
             'success' => true,
             'message' => 'Reserva confirmada!',
             'reservation' => [
@@ -339,11 +347,6 @@ class TotemController extends Controller
                 'end'   => substr($endTime, 0, 5),
             ],
         ]);
-
-        // Notificações (e-mail + webhook). Falhas não bloqueiam a reserva.
-        $notifier = new NotificationService();
-        $notifier->notifyReservation($notificationData);
-        exit;
     }
 
     /**
