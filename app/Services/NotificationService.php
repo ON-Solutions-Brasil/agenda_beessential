@@ -232,18 +232,36 @@ class NotificationService
      */
     private function smtpSend(string $host, int $port, string $enc, string $user, string $pass, string $fromEmail, string $fromName, string $toEmail, string $toName, string $subject, string $htmlBody): bool
     {
-        $transport = ($enc === 'ssl') ? "ssl://{$host}" : $host;
-        $fp = @fsockopen($transport, $port, $errno, $errstr, 15);
+        // A porta 465 usa SSL implícito (o TLS começa imediatamente na conexão).
+        // A porta 587 usa STARTTLS. Detecta automaticamente para evitar erro de handshake.
+        $useImplicitSsl = ($enc === 'ssl' || $port === 465);
+        $useStartTls    = (!$useImplicitSsl && ($enc === 'tls' || $port === 587));
+
+        $context = stream_context_create([
+            'ssl' => [
+                'verify_peer'       => false,
+                'verify_peer_name'  => false,
+                'allow_self_signed' => true,
+            ],
+        ]);
+
+        $transport = ($useImplicitSsl ? 'ssl://' : 'tcp://') . $host . ':' . $port;
+        $fp = @stream_socket_client($transport, $errno, $errstr, 15, STREAM_CLIENT_CONNECT, $context);
         if (!$fp) {
-            throw new \RuntimeException("Conexão falhou: {$errstr} ({$errno})");
+            throw new \RuntimeException("Conexão falhou em {$host}:{$port} — {$errstr} ({$errno})");
         }
         stream_set_timeout($fp, 15);
 
         $read = function () use ($fp) {
             $data = '';
-            while ($line = fgets($fp, 515)) {
+            while (($line = fgets($fp, 515)) !== false) {
                 $data .= $line;
+                // Linha final de uma resposta SMTP: "250 ..." (espaço após o código)
                 if (isset($line[3]) && $line[3] === ' ') {
+                    break;
+                }
+                $meta = stream_get_meta_data($fp);
+                if (!empty($meta['timed_out'])) {
                     break;
                 }
             }
@@ -263,7 +281,7 @@ class NotificationService
         $ehloHost = $_SERVER['SERVER_NAME'] ?? 'localhost';
         $cmd("EHLO {$ehloHost}");
 
-        if ($enc === 'tls') {
+        if ($useStartTls) {
             $startResp = $cmd('STARTTLS');
             // Só habilita a criptografia se o servidor confirmar (220)
             if (strpos($startResp, '220') === false) {
