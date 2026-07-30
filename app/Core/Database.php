@@ -12,7 +12,17 @@ class Database
 
     private function __construct()
     {
-        $config = require __DIR__ . '/../../config/database.php';
+        $configPath = __DIR__ . '/../../config/database.php';
+
+        if (!file_exists($configPath)) {
+            throw new \RuntimeException("Arquivo de configuração do banco não encontrado: {$configPath}");
+        }
+
+        $config = require $configPath;
+
+        if (!is_array($config) || empty($config['username'])) {
+            throw new \RuntimeException("Configuração do banco de dados inválida ou incompleta.");
+        }
 
         $dsn = "{$config['driver']}:host={$config['host']};port={$config['port']};dbname={$config['database']};charset={$config['charset']}";
 
