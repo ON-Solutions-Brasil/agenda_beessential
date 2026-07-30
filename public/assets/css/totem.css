@@ -516,3 +516,43 @@
     .totem-clock { font-size: 1.5rem; }
     .totem-panel { max-width: 100%; }
 }
+
+/* ─── Estado de erro de carregamento ───────────────── */
+
+.totem-load-error {
+    width: 100%;
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: #64748b;
+}
+
+.totem-load-error i {
+    font-size: 3rem;
+    color: var(--totem-occupied);
+    display: block;
+    margin-bottom: .75rem;
+}
+
+.totem-load-error-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: .5rem;
+}
+
+.totem-load-error-msg {
+    font-size: .9rem;
+    background: #fff1f2;
+    color: #991b1b;
+    border-radius: .5rem;
+    padding: .75rem 1rem;
+    max-width: 640px;
+    margin: 0 auto .75rem;
+    word-break: break-word;
+    font-family: monospace;
+}
+
+.totem-load-error-hint {
+    font-size: .85rem;
+    color: #94a3b8;
+}

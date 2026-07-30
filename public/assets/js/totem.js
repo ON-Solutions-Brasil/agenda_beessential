@@ -85,21 +85,45 @@ function initTotemDashboard() {
 
     // Busca dados das salas
     function loadRooms() {
-        fetch('/totem/rooms')
-            .then(r => r.json())
+        fetch('/totem/rooms', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) {
+                return r.text().then(function (text) {
+                    if (!r.ok) {
+                        throw new Error('HTTP ' + r.status + ': ' + text.slice(0, 300));
+                    }
+                    try {
+                        return JSON.parse(text);
+                    } catch (e) {
+                        throw new Error('Resposta inválida do servidor: ' + text.slice(0, 300));
+                    }
+                });
+            })
             .then(data => {
-                roomsData = data.rooms;
+                roomsData = data.rooms || [];
                 refreshMs = data.refresh_ms || refreshMs;
                 renderDate(data.date);
-                renderRooms(data.rooms);
+                renderRooms(roomsData);
                 // Se o painel estiver aberto, atualiza também
                 if (currentRoom) {
-                    const updated = data.rooms.find(r => r.id === currentRoom.id);
+                    const updated = roomsData.find(r => r.id === currentRoom.id);
                     if (updated) refreshPanel(updated);
                 }
             })
-            .catch(err => console.error('Erro ao carregar salas:', err))
+            .catch(err => {
+                console.error('Erro ao carregar salas:', err);
+                showLoadError(err.message);
+            })
             .finally(scheduleNext);
+    }
+
+    function showLoadError(msg) {
+        grid.innerHTML =
+            '<div class="totem-load-error">' +
+                '<i class="bi bi-exclamation-triangle"></i>' +
+                '<div class="totem-load-error-title">Não foi possível carregar as salas</div>' +
+                '<div class="totem-load-error-msg">' + escapeHtml(msg || 'Erro desconhecido') + '</div>' +
+                '<div class="totem-load-error-hint">Nova tentativa automática em instantes...</div>' +
+            '</div>';
     }
 
     function scheduleNext() {
