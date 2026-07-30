@@ -123,9 +123,9 @@
 }
 
 .totem-logo {
-    height: 42px;
+    height: 56px;
     width: auto;
-    max-width: 160px;
+    max-width: 240px;
     object-fit: contain;
 }
 
@@ -137,7 +137,7 @@
     padding: 1.25rem 1.75rem;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-start;
     box-shadow: 0 2px 12px rgba(0,0,0,.25);
     border-bottom: 3px solid var(--totem-primary);
     position: sticky;
@@ -148,7 +148,14 @@
 .totem-header .bi { color: var(--totem-primary); }
 .totem-clock { color: var(--totem-primary); }
 
-.totem-title { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.totem-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: .15rem;
+}
+.totem-logo-icon { font-size: 2.75rem; color: var(--totem-primary); }
+.totem-title { font-size: 1.5rem; font-weight: 700; line-height: 1.15; margin-top: .35rem; }
 .totem-subtitle { font-size: .95rem; opacity: .85; text-transform: capitalize; }
 .totem-clock { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .totem-exit { border-radius: .75rem; padding: .5rem .75rem; }

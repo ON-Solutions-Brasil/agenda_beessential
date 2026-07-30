@@ -1,15 +1,13 @@
 <?php use App\Core\View; ?>
 <div class="totem-header">
-    <div class="d-flex align-items-center gap-2">
+    <div class="totem-brand">
         <?php if (!empty($logo)): ?>
         <img src="<?= View::escape($logo) ?>" alt="Logo" class="totem-logo">
         <?php else: ?>
-        <i class="bi bi-easel fs-3"></i>
+        <i class="bi bi-easel totem-logo-icon"></i>
         <?php endif; ?>
-        <div>
-            <div class="totem-title">Reserva de Salas</div>
-            <div class="totem-subtitle" id="totemDate"></div>
-        </div>
+        <div class="totem-title">Sala de Reservas</div>
+        <div class="totem-subtitle" id="totemDate"></div>
     </div>
     <div class="d-flex align-items-center gap-3">
         <div class="totem-clock" id="totemClock">--:--</div>
