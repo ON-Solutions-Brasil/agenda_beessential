@@ -37,5 +37,16 @@
                 <i class="bi bi-box-arrow-in-right me-2"></i>Entrar
             </button>
         </form>
+
+        <div class="text-center mt-3">
+            <div class="d-flex align-items-center my-3">
+                <hr class="flex-grow-1">
+                <span class="px-2 text-muted small">ou</span>
+                <hr class="flex-grow-1">
+            </div>
+            <a href="/totem/pin" class="btn btn-outline-primary w-100 py-2">
+                <i class="bi bi-easel me-2"></i>Acessar Totem
+            </a>
+        </div>
     </div>
 </div>

@@ -13,6 +13,7 @@
         'reunioes' => 'Reuniões',
         'horarios' => 'Horários de Trabalho',
         'google' => 'Google API',
+        'totem' => 'Modo Totem',
     ];
     ?>
 

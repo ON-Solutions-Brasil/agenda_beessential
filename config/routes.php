@@ -13,12 +13,22 @@ use App\Controllers\MeetingController;
 use App\Controllers\CalendarController;
 use App\Controllers\SettingsController;
 use App\Controllers\AdminController;
+use App\Controllers\TotemController;
+use App\Controllers\TotemAdminController;
 
 return [
     // ─── Autenticação ───────────────────────────────────────────
     'GET  /login'    => [AuthController::class, 'showLogin'],
     'POST /login'    => [AuthController::class, 'login'],
     'GET  /logout'   => [AuthController::class, 'logout'],
+
+    // ─── Totem (acesso por PIN, sem login) ──────────────────────
+    'GET  /totem/pin'    => [TotemController::class, 'pin'],
+    'POST /totem/pin'    => [TotemController::class, 'verifyPin'],
+    'GET  /totem/exit'   => [TotemController::class, 'exit'],
+    'GET  /totem'        => [TotemController::class, 'index'],
+    'GET  /totem/rooms'  => [TotemController::class, 'rooms'],
+    'POST /totem/reserve'=> [TotemController::class, 'reserve'],
 
     // ─── Dashboard ──────────────────────────────────────────────
     'GET  /'          => [DashboardController::class, 'index'],
@@ -60,4 +70,15 @@ return [
     'POST /admin/roles/{id}/delete'   => [AdminController::class, 'deleteRole'],
     'GET  /admin/permissions'         => [AdminController::class, 'permissions'],
     'POST /admin/permissions/sync'    => [AdminController::class, 'syncPermissions'],
+
+    // ─── Admin: Modo Totem ──────────────────────────────────────
+    'GET  /admin/totem'                => [TotemAdminController::class, 'index'],
+    'POST /admin/totem/save'           => [TotemAdminController::class, 'save'],
+    'POST /admin/totem/rooms/store'    => [TotemAdminController::class, 'storeRoom'],
+    'POST /admin/totem/rooms/{id}/update' => [TotemAdminController::class, 'updateRoom'],
+    'POST /admin/totem/rooms/{id}/delete' => [TotemAdminController::class, 'deleteRoom'],
+    'GET  /admin/totem/rooms/{id}/items'  => [TotemAdminController::class, 'items'],
+    'POST /admin/totem/items/store'       => [TotemAdminController::class, 'storeItem'],
+    'POST /admin/totem/items/{id}/update' => [TotemAdminController::class, 'updateItem'],
+    'POST /admin/totem/items/{id}/delete' => [TotemAdminController::class, 'deleteItem'],
 ];

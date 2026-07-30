@@ -58,6 +58,7 @@ use App\Core\View;
                             <li><a class="dropdown-item" href="/admin"><i class="bi bi-speedometer me-2"></i>Painel</a></li>
                             <li><a class="dropdown-item" href="/admin/roles"><i class="bi bi-person-badge me-2"></i>Roles</a></li>
                             <li><a class="dropdown-item" href="/admin/permissions"><i class="bi bi-key me-2"></i>Permissões</a></li>
+                            <li><a class="dropdown-item" href="/admin/totem"><i class="bi bi-easel me-2"></i>Modo Totem</a></li>
                         </ul>
                     </li>
                     <?php endif; ?>

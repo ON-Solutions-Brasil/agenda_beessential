@@ -1,0 +1,518 @@
+/* ===================================================
+   Modo Totem - Interface de autoatendimento
+   Otimizado para telas sensíveis ao toque
+   =================================================== */
+
+:root {
+    --totem-primary: #667eea;
+    --totem-primary-2: #764ba2;
+    --totem-available: #16a34a;
+    --totem-occupied: #dc2626;
+    --totem-soon: #f59e0b;
+}
+
+* { box-sizing: border-box; }
+
+.totem-body {
+    margin: 0;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #eef1f8;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+}
+
+/* ─── Tela de PIN ──────────────────────────────────── */
+
+.totem-pin-wrapper {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--totem-primary) 0%, var(--totem-primary-2) 100%);
+    padding: 1rem;
+}
+
+.totem-pin-card {
+    background: #fff;
+    border-radius: 1.5rem;
+    padding: 2.5rem 2rem;
+    width: 100%;
+    max-width: 420px;
+    box-shadow: 0 1.5rem 3rem rgba(0,0,0,.25);
+}
+
+.totem-pin-logo {
+    font-size: 3.5rem;
+    color: var(--totem-primary);
+}
+
+.totem-pin-display {
+    width: 100%;
+    text-align: center;
+    font-size: 2.5rem;
+    letter-spacing: 1rem;
+    padding: .75rem;
+    border: 2px solid #e2e8f0;
+    border-radius: .75rem;
+    margin-bottom: 1.5rem;
+    background: #f8fafc;
+    font-weight: 700;
+}
+
+.totem-keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .75rem;
+}
+
+.totem-key {
+    font-size: 1.75rem;
+    font-weight: 600;
+    padding: 1.25rem;
+    border: none;
+    border-radius: 1rem;
+    background: #f1f5f9;
+    color: #1e293b;
+    cursor: pointer;
+    transition: transform .1s, background .15s;
+}
+
+.totem-key:active {
+    transform: scale(.94);
+    background: #e2e8f0;
+}
+
+.totem-key-action {
+    background: #e2e8f0;
+    color: #64748b;
+}
+
+.totem-btn-lg {
+    font-size: 1.25rem;
+    padding: 1rem;
+    border-radius: 1rem;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    border: none;
+}
+
+/* ─── Cabeçalho ────────────────────────────────────── */
+
+.totem-header {
+    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    color: #fff;
+    padding: 1.25rem 1.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 12px rgba(0,0,0,.15);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.totem-title { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.totem-subtitle { font-size: .95rem; opacity: .85; text-transform: capitalize; }
+.totem-clock { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.totem-exit { border-radius: .75rem; padding: .5rem .75rem; }
+
+/* ─── Grade de salas ───────────────────────────────── */
+
+.totem-main { padding: 1.75rem; }
+
+.totem-rooms {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.totem-room-card {
+    background: #fff;
+    border-radius: 1.25rem;
+    padding: 1.75rem;
+    cursor: pointer;
+    border: 3px solid transparent;
+    box-shadow: 0 4px 16px rgba(0,0,0,.06);
+    transition: transform .12s, box-shadow .12s;
+    position: relative;
+    overflow: hidden;
+}
+
+.totem-room-card:active { transform: scale(.98); }
+
+.totem-room-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 8px;
+}
+
+.totem-room-card.status-available::before { background: var(--totem-available); }
+.totem-room-card.status-occupied::before { background: var(--totem-occupied); }
+.totem-room-card.status-soon::before { background: var(--totem-soon); }
+
+.totem-room-icon {
+    font-size: 3rem;
+    color: var(--totem-primary);
+    margin-bottom: .5rem;
+}
+
+.totem-room-name { font-size: 1.4rem; font-weight: 700; color: #1e293b; }
+.totem-room-capacity { font-size: .9rem; color: #94a3b8; margin-bottom: 1rem; }
+
+.totem-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: .5rem 1rem;
+    border-radius: 2rem;
+    color: #fff;
+}
+
+.totem-status-badge.status-available { background: var(--totem-available); }
+.totem-status-badge.status-occupied { background: var(--totem-occupied); }
+.totem-status-badge.status-soon { background: var(--totem-soon); }
+
+.totem-room-info { font-size: .9rem; color: #64748b; margin-top: .75rem; }
+
+/* ─── Painel lateral ───────────────────────────────── */
+
+.totem-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.4);
+    z-index: 20;
+    display: none;
+}
+.totem-overlay.show { display: block; }
+
+.totem-panel {
+    position: fixed;
+    top: 0; right: 0;
+    width: 100%;
+    max-width: 460px;
+    height: 100vh;
+    background: #fff;
+    z-index: 30;
+    transform: translateX(100%);
+    transition: transform .25s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: -8px 0 24px rgba(0,0,0,.15);
+}
+.totem-panel.show { transform: translateX(0); }
+
+.totem-panel-header {
+    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    color: #fff;
+    padding: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+.totem-panel-title { font-size: 1.5rem; font-weight: 700; }
+.totem-panel-status { font-size: 1rem; opacity: .9; margin-top: .25rem; }
+
+.btn-close-panel {
+    background: rgba(255,255,255,.2);
+    border: none;
+    color: #fff;
+    width: 44px; height: 44px;
+    border-radius: .75rem;
+    font-size: 1.25rem;
+    cursor: pointer;
+}
+
+.totem-panel-body {
+    padding: 1.5rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.totem-section-title {
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: .75rem;
+}
+
+.totem-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: .75rem;
+    margin-top: .5rem;
+}
+
+/* ─── Descrição / prévia da sala ───────────────────── */
+
+.totem-room-desc {
+    background: #f8fafc;
+    border-left: 4px solid var(--totem-primary);
+    padding: .85rem 1rem;
+    border-radius: .5rem;
+    color: #475569;
+    font-size: .98rem;
+    line-height: 1.4;
+    margin-bottom: 1.25rem;
+}
+
+/* ─── Itens da sala (cardápio / checklist) ─────────── */
+
+.totem-items {
+    display: flex;
+    flex-direction: column;
+    gap: .6rem;
+}
+
+.totem-item {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    background: #fff;
+    border: 2px solid #eef1f8;
+    border-radius: .85rem;
+    padding: .85rem 1rem;
+    transition: border-color .15s, background .15s, transform .1s;
+}
+
+.totem-item.checkable { cursor: pointer; }
+.totem-item.checkable:active { transform: scale(.98); }
+
+.totem-item.checked {
+    border-color: var(--totem-available);
+    background: #f0fdf4;
+}
+
+.totem-item-icon {
+    font-size: 1.6rem;
+    color: var(--totem-primary);
+    flex-shrink: 0;
+}
+
+.totem-item.checked .totem-item-icon { color: var(--totem-available); }
+
+.totem-item-info { flex: 1; min-width: 0; }
+.totem-item-name { font-weight: 600; color: #1e293b; font-size: 1.05rem; }
+.totem-item-desc { font-size: .88rem; color: #64748b; margin-top: .15rem; }
+
+.totem-item-check {
+    font-size: 1.5rem;
+    color: #cbd5e1;
+    flex-shrink: 0;
+}
+.totem-item.checked .totem-item-check { color: var(--totem-available); }
+
+.totem-checklist-toggle {
+    border: 2px solid var(--totem-primary);
+    background: #fff;
+    color: var(--totem-primary);
+    border-radius: 2rem;
+    padding: .35rem .9rem;
+    font-size: .85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+}
+.totem-checklist-toggle.active {
+    background: var(--totem-primary);
+    color: #fff;
+}
+
+.totem-checklist-progress { margin-top: 1rem; }
+.totem-progress-text {
+    font-size: .85rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: .35rem;
+}
+.totem-progress-bar {
+    height: 10px;
+    background: #eef1f8;
+    border-radius: 2rem;
+    overflow: hidden;
+}
+.totem-progress-bar span {
+    display: block;
+    height: 100%;
+    background: var(--totem-available);
+    border-radius: 2rem;
+    transition: width .3s ease;
+}
+
+.totem-next {
+    background: #fef3c7;
+    color: #92400e;
+    padding: .75rem 1rem;
+    border-radius: .75rem;
+    margin-bottom: 1rem;
+    font-weight: 600;
+}
+.totem-next:empty { display: none; }
+
+/* ─── Janelas de horário ───────────────────────────── */
+
+.totem-slots {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .6rem;
+}
+
+.totem-slot {
+    padding: .85rem .25rem;
+    border-radius: .75rem;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1rem;
+    border: 2px solid transparent;
+}
+
+.totem-slot.available {
+    background: #dcfce7;
+    color: #166534;
+    cursor: pointer;
+}
+.totem-slot.available:active { transform: scale(.95); }
+.totem-slot.available.selected {
+    background: var(--totem-available);
+    color: #fff;
+}
+
+.totem-slot.occupied {
+    background: #fee2e2;
+    color: #991b1b;
+    text-decoration: line-through;
+    opacity: .7;
+}
+
+.totem-slot.past {
+    background: #f1f5f9;
+    color: #cbd5e1;
+}
+
+/* ─── Formulário de reserva ────────────────────────── */
+
+.totem-reserve-form .form-control { font-size: 1.1rem; padding: .75rem 1rem; }
+.totem-reserve-form .form-label { font-weight: 600; }
+
+.totem-selected-slot {
+    background: #eef2ff;
+    color: var(--totem-primary-2);
+    padding: .85rem 1rem;
+    border-radius: .75rem;
+    font-weight: 700;
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+}
+
+.totem-slot-time {
+    background: #fff;
+    color: var(--totem-primary);
+    padding: .2rem .6rem;
+    border-radius: 2rem;
+    font-variant-numeric: tabular-nums;
+    font-size: .95rem;
+}
+
+/* ─── Seletor de duração ───────────────────────────── */
+
+.totem-duration-label {
+    font-weight: 600;
+    color: #475569;
+    display: block;
+    margin-bottom: .5rem;
+}
+
+.totem-durations {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: 1.25rem;
+}
+
+.totem-duration-chip {
+    flex: 1 1 auto;
+    min-width: 72px;
+    padding: .7rem .5rem;
+    border: 2px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    border-radius: .75rem;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform .1s, border-color .15s, background .15s;
+}
+
+.totem-duration-chip:active { transform: scale(.95); }
+
+.totem-duration-chip.active {
+    background: var(--totem-primary);
+    border-color: var(--totem-primary);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(102,126,234,.35);
+}
+
+.totem-duration-empty {
+    color: #94a3b8;
+    font-style: italic;
+    margin-bottom: 1rem;
+}
+
+.totem-form-error {
+    color: var(--totem-occupied);
+    font-weight: 600;
+    margin-bottom: 1rem;
+}
+.totem-form-error:empty { display: none; }
+
+/* ─── Sucesso ──────────────────────────────────────── */
+
+.totem-success {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.5);
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.totem-success.show { display: flex; }
+
+.totem-success-card {
+    background: #fff;
+    border-radius: 1.5rem;
+    padding: 3rem 2.5rem;
+    text-align: center;
+    max-width: 400px;
+    width: 100%;
+    animation: totemPop .3s ease;
+}
+
+.totem-success-icon {
+    font-size: 4.5rem;
+    color: var(--totem-available);
+    display: block;
+    margin-bottom: 1rem;
+}
+
+@keyframes totemPop {
+    from { opacity: 0; transform: scale(.85); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@media (max-width: 640px) {
+    .totem-rooms { grid-template-columns: 1fr; }
+    .totem-clock { font-size: 1.5rem; }
+    .totem-panel { max-width: 100%; }
+}
