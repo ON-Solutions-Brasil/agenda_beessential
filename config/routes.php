@@ -29,6 +29,8 @@ return [
     'GET  /totem'        => [TotemController::class, 'index'],
     'GET  /totem/rooms'  => [TotemController::class, 'rooms'],
     'POST /totem/reserve'=> [TotemController::class, 'reserve'],
+    'POST /totem/reservation/detail' => [TotemController::class, 'reservationDetail'],
+    'POST /totem/reservation/update' => [TotemController::class, 'updateReservation'],
 
     // ─── Dashboard ──────────────────────────────────────────────
     'GET  /'          => [DashboardController::class, 'index'],
@@ -81,4 +83,8 @@ return [
     'POST /admin/totem/items/store'       => [TotemAdminController::class, 'storeItem'],
     'POST /admin/totem/items/{id}/update' => [TotemAdminController::class, 'updateItem'],
     'POST /admin/totem/items/{id}/delete' => [TotemAdminController::class, 'deleteItem'],
+    'POST /admin/totem/sellers/store'       => [TotemAdminController::class, 'storeSeller'],
+    'POST /admin/totem/sellers/{id}/update' => [TotemAdminController::class, 'updateSeller'],
+    'POST /admin/totem/sellers/{id}/delete' => [TotemAdminController::class, 'deleteSeller'],
+    'GET  /admin/totem/logs'                => [TotemAdminController::class, 'logs'],
 ];

@@ -53,11 +53,15 @@ function initCalendar() {
             // Tooltip com detalhes
             const props = info.event.extendedProps;
             let tooltip = info.event.title;
-            if (props.organizer) {
-                tooltip += '\nOrganizador: ' + props.organizer;
-            }
-            if (props.location) {
-                tooltip += '\nLocal: ' + props.location;
+            if (props.tipo) {
+                tooltip += '\n' + props.tipo;
+                if (props.visitante) tooltip += '\nVisitante: ' + props.visitante;
+                if (props.telefone) tooltip += '\nTelefone: ' + props.telefone;
+                if (props.vendedor) tooltip += '\nVendedor: ' + props.vendedor;
+                if (props.interesse) tooltip += '\nInteresse: ' + props.interesse;
+            } else {
+                if (props.organizer) tooltip += '\nOrganizador: ' + props.organizer;
+                if (props.location) tooltip += '\nLocal: ' + props.location;
             }
             info.el.setAttribute('title', tooltip);
         },

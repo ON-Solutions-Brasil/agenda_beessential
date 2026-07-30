@@ -15,7 +15,7 @@ class Room extends Model
     {
         $sql = "SELECT * FROM {$this->table}
                 WHERE active = 1 AND show_in_totem = 1
-                ORDER BY sort_order ASC, name ASC";
+                ORDER BY name ASC";
         return $this->db()->query($sql);
     }
 

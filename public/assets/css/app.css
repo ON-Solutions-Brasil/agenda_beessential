@@ -3,58 +3,101 @@
    =================================================== */
 
 :root {
-    --bs-primary: #667eea;
+    --bs-primary: #111111;
+    --brand-dark: #111111;
+    --brand-dark-2: #1c1c1c;
+    --brand-accent: #FFC107;
+    --brand-accent-2: #FFA000;
     --sidebar-width: 0px;
 }
 
 /* ─── Layout Geral ─────────────────────────────────── */
 
 body {
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-    background-color: #f8f9fa;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background-color: #f4f5f7;
+    color: #1e293b;
 }
 
 .main-content {
-    margin-top: 56px; /* Altura da navbar */
-    min-height: calc(100vh - 56px);
+    margin-top: 60px;
+    min-height: calc(100vh - 60px);
 }
+
+.container-fluid.py-4 { max-width: 1320px; }
+
+h2 { font-weight: 700; letter-spacing: -.02em; }
 
 /* ─── Navbar ───────────────────────────────────────── */
 
+.navbar.bg-primary {
+    background: var(--brand-dark) !important;
+    border-bottom: 3px solid var(--brand-accent);
+}
+
 .navbar {
-    box-shadow: 0 2px 4px rgba(0,0,0,.08);
+    box-shadow: 0 2px 12px rgba(0,0,0,.12);
+    padding-top: .6rem;
+    padding-bottom: .6rem;
 }
 
 .navbar-brand {
-    font-size: 1.1rem;
+    font-size: 1.15rem;
+    font-weight: 700;
 }
+.navbar-brand .bi { color: var(--brand-accent); }
 
 .nav-link {
-    font-size: 0.9rem;
-    padding: .5rem .75rem !important;
-    border-radius: .375rem;
-    transition: background-color .15s;
+    font-size: .9rem;
+    padding: .5rem .85rem !important;
+    border-radius: .5rem;
+    transition: background-color .15s, color .15s;
+    color: rgba(255,255,255,.75) !important;
 }
 
 .nav-link:hover {
-    background-color: rgba(255,255,255,.1);
+    background-color: rgba(255,193,7,.12);
+    color: #fff !important;
 }
+
+.nav-link.active {
+    background-color: var(--brand-accent);
+    color: var(--brand-dark) !important;
+    font-weight: 600;
+}
+
+.dropdown-menu {
+    border: none;
+    border-radius: .75rem;
+    box-shadow: 0 .75rem 2rem rgba(0,0,0,.15);
+    padding: .4rem;
+}
+.dropdown-item { border-radius: .5rem; padding: .5rem .75rem; font-size: .9rem; }
+.dropdown-item:active { background: var(--brand-accent); color: var(--brand-dark); }
 
 /* ─── Cards ────────────────────────────────────────── */
 
 .card {
-    border-radius: .75rem;
-    transition: box-shadow .2s;
+    border-radius: 1rem;
+    border: 1px solid #eceef2;
+    transition: box-shadow .2s, transform .2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
 }
 
-.card:hover {
-    box-shadow: 0 .5rem 1rem rgba(0,0,0,.08) !important;
+.card.shadow-sm:hover {
+    box-shadow: 0 .75rem 1.5rem rgba(0,0,0,.08) !important;
+    transform: translateY(-2px);
 }
 
 .card-header {
-    border-bottom: 1px solid rgba(0,0,0,.05);
-    font-size: .9rem;
+    border-bottom: 1px solid #eceef2;
+    font-size: .95rem;
+    padding: 1rem 1.25rem;
+    background: #fff !important;
 }
+.card-header strong { font-weight: 700; }
+
+.card-footer { background: #fff !important; border-top: 1px solid #eceef2; }
 
 /* ─── Tabelas ──────────────────────────────────────── */
 
@@ -88,8 +131,14 @@ body {
 
 .form-control:focus,
 .form-select:focus {
-    border-color: var(--bs-primary);
-    box-shadow: 0 0 0 .2rem rgba(102, 126, 234, .15);
+    border-color: var(--brand-accent);
+    box-shadow: 0 0 0 .2rem rgba(255, 193, 7, .2);
+}
+
+.form-control, .form-select {
+    border-radius: .6rem;
+    border-color: #e2e5ec;
+    padding: .55rem .85rem;
 }
 
 /* ─── Botões ───────────────────────────────────────── */
@@ -100,13 +149,30 @@ body {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, #667eea, #764ba2);
+    background: var(--brand-accent);
     border: none;
+    color: var(--brand-dark);
+    font-weight: 600;
 }
 
-.btn-primary:hover {
-    background: linear-gradient(135deg, #5a6fd6, #6a4292);
+.btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+    background: var(--brand-accent-2) !important;
+    color: var(--brand-dark) !important;
 }
+
+.btn-outline-primary {
+    color: #111;
+    border-color: #d7d9df;
+}
+.btn-outline-primary:hover {
+    background: var(--brand-accent);
+    border-color: var(--brand-accent);
+    color: var(--brand-dark);
+}
+
+.badge.bg-primary { background: var(--brand-accent) !important; color: var(--brand-dark) !important; }
+a { color: #b8860b; }
+.text-primary { color: #111 !important; }
 
 /* ─── Calendário FullCalendar ──────────────────────── */
 

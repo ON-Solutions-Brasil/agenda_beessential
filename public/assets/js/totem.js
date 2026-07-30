@@ -156,8 +156,11 @@ function initTotemDashboard() {
                 info = 'Livre pelo restante do dia';
             }
             const cap = room.capacity ? '<div class="totem-room-capacity"><i class="bi bi-people me-1"></i>' + room.capacity + ' pessoas</div>' : '<div class="totem-room-capacity">&nbsp;</div>';
+            const visual = room.image
+                ? '<img src="' + room.image + '" alt="" class="totem-room-img">'
+                : '<i class="bi ' + room.icon + ' totem-room-icon"></i>';
             return '<div class="totem-room-card status-' + room.status + '" data-room-id="' + room.id + '">' +
-                '<i class="bi ' + room.icon + ' totem-room-icon"></i>' +
+                '<div class="totem-room-visual">' + visual + '</div>' +
                 '<div class="totem-room-name">' + escapeHtml(room.name) + '</div>' +
                 cap +
                 '<span class="totem-status-badge status-' + room.status + '">' + statusLabels[room.status] + '</span>' +
@@ -303,9 +306,11 @@ function initTotemDashboard() {
             else cls += 'available';
             const sel = (selectedSlot === slot.start) ? ' selected' : '';
             return '<div class="' + cls + sel + '" data-start="' + slot.start + '" ' +
-                'data-max="' + (slot.max_minutes || 0) + '">' + slot.start + '</div>';
+                'data-max="' + (slot.max_minutes || 0) + '" ' +
+                'data-reservation="' + (slot.reservation_id || '') + '">' + slot.start + '</div>';
         }).join('');
 
+        // Horários livres → nova reserva
         container.querySelectorAll('.totem-slot.available').forEach(el => {
             el.addEventListener('click', function () {
                 selectedSlot = el.getAttribute('data-start');
@@ -313,6 +318,16 @@ function initTotemDashboard() {
                 container.querySelectorAll('.totem-slot').forEach(s => s.classList.remove('selected'));
                 el.classList.add('selected');
                 showReserveForm(room, selectedSlot, selectedMaxMinutes);
+            });
+        });
+
+        // Horários ocupados → editar (após PIN)
+        container.querySelectorAll('.totem-slot.occupied').forEach(el => {
+            const resId = el.getAttribute('data-reservation');
+            if (!resId) return;
+            el.classList.add('clickable');
+            el.addEventListener('click', function () {
+                openEditModal(parseInt(resId, 10));
             });
         });
     }
@@ -392,6 +407,8 @@ function initTotemDashboard() {
             document.getElementById('fieldName').value = '';
             document.getElementById('fieldPhone').value = '';
             document.getElementById('fieldEmail').value = '';
+            document.getElementById('fieldSeller').value = '';
+            document.getElementById('fieldInterest').value = '';
             document.getElementById('formError').textContent = '';
         }
     }
@@ -427,6 +444,8 @@ function initTotemDashboard() {
         body.append('room_id', document.getElementById('fieldRoomId').value);
         body.append('start_time', document.getElementById('fieldStartTime').value);
         body.append('duration', selectedDuration);
+        body.append('seller_id', document.getElementById('fieldSeller').value);
+        body.append('interest', document.getElementById('fieldInterest').value.trim());
         body.append('customer_name', name);
         body.append('customer_phone', phone);
         body.append('customer_email', email);
@@ -446,6 +465,101 @@ function initTotemDashboard() {
             })
             .catch(() => { errEl.textContent = 'Erro de conexão. Tente novamente.'; })
             .finally(() => { btn.disabled = false; });
+    });
+
+    /* ─── Edição de reserva (protegida por PIN) ─── */
+    const editModal = document.getElementById('editModal');
+
+    function openEditModal(reservationId) {
+        document.getElementById('editReservationId').value = reservationId;
+        document.getElementById('editPin').value = '';
+        document.getElementById('editPinError').textContent = '';
+        document.getElementById('editError').textContent = '';
+        document.getElementById('editPinStep').style.display = 'block';
+        document.getElementById('editDataStep').style.display = 'none';
+        document.getElementById('editModalTitle').innerHTML = '<i class="bi bi-lock me-1"></i>Reserva';
+        editModal.classList.add('show');
+        setTimeout(() => document.getElementById('editPin').focus(), 100);
+    }
+
+    function closeEditModal() {
+        editModal.classList.remove('show');
+    }
+
+    document.getElementById('closeEdit').addEventListener('click', closeEditModal);
+
+    document.getElementById('editPinSubmit').addEventListener('click', function () {
+        const pin = document.getElementById('editPin').value.trim();
+        const errEl = document.getElementById('editPinError');
+        if (pin.length !== 4) { errEl.textContent = 'Digite os 4 dígitos.'; return; }
+
+        const body = new URLSearchParams();
+        body.append('_csrf_token', csrfToken);
+        body.append('reservation_id', document.getElementById('editReservationId').value);
+        body.append('pin', pin);
+
+        this.disabled = true;
+        fetch('/totem/reservation/detail', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => {
+                if (!data.success) { errEl.textContent = data.message || 'Erro.'; return; }
+                const r = data.reservation;
+                document.getElementById('editSlotLabel').innerHTML =
+                    '<i class="bi bi-clock me-1"></i>' + r.start + ' – ' + r.end;
+                document.getElementById('editName').value = r.customer_name || '';
+                document.getElementById('editPhone').value = r.customer_phone || '';
+                document.getElementById('editEmail').value = r.customer_email || '';
+                document.getElementById('editSeller').value = r.seller_id ? String(r.seller_id) : '';
+                document.getElementById('editInterest').value = r.interest || '';
+                document.getElementById('editPinStep').style.display = 'none';
+                document.getElementById('editDataStep').style.display = 'block';
+                document.getElementById('editModalTitle').innerHTML = '<i class="bi bi-pencil me-1"></i>Editar reserva';
+            })
+            .catch(() => { errEl.textContent = 'Erro de conexão.'; })
+            .finally(() => { this.disabled = false; });
+    });
+
+    document.getElementById('editSave').addEventListener('click', function () {
+        const errEl = document.getElementById('editError');
+        const name = document.getElementById('editName').value.trim();
+        if (!name) { errEl.textContent = 'Informe o nome.'; return; }
+
+        const body = new URLSearchParams();
+        body.append('_csrf_token', csrfToken);
+        body.append('reservation_id', document.getElementById('editReservationId').value);
+        body.append('pin', document.getElementById('editPin').value.trim());
+        body.append('seller_id', document.getElementById('editSeller').value);
+        body.append('customer_name', name);
+        body.append('customer_phone', document.getElementById('editPhone').value.trim());
+        body.append('customer_email', document.getElementById('editEmail').value.trim());
+        body.append('interest', document.getElementById('editInterest').value.trim());
+
+        this.disabled = true;
+        fetch('/totem/reservation/update', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { closeEditModal(); loadRooms(); }
+                else { errEl.textContent = data.message || 'Erro ao salvar.'; }
+            })
+            .catch(() => { errEl.textContent = 'Erro de conexão.'; })
+            .finally(() => { this.disabled = false; });
+    });
+
+    document.getElementById('editCancelReservation').addEventListener('click', function () {
+        if (!confirm('Cancelar esta reserva? Esta ação libera o horário.')) return;
+        const body = new URLSearchParams();
+        body.append('_csrf_token', csrfToken);
+        body.append('reservation_id', document.getElementById('editReservationId').value);
+        body.append('pin', document.getElementById('editPin').value.trim());
+        body.append('action', 'cancel');
+
+        fetch('/totem/reservation/update', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { closeEditModal(); loadRooms(); }
+                else { document.getElementById('editError').textContent = data.message || 'Erro.'; }
+            })
+            .catch(() => { document.getElementById('editError').textContent = 'Erro de conexão.'; });
     });
 
     /* ─── Sucesso ─── */

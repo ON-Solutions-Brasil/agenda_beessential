@@ -7,6 +7,8 @@ use App\Core\Session;
 use App\Models\Setting;
 use App\Models\Room;
 use App\Models\RoomItem;
+use App\Models\Seller;
+use App\Models\NotificationLog;
 use App\Models\ActivityLog;
 
 /**
@@ -33,9 +35,12 @@ class TotemAdminController extends Controller
 
         $keys = [
             'totem_enabled', 'totem_pin', 'totem_open_time', 'totem_close_time',
-            'totem_slot_minutes', 'totem_default_duration', 'totem_min_duration',
-            'totem_max_duration', 'totem_advance_minutes', 'totem_require_email',
-            'totem_refresh_seconds',
+            'totem_slot_minutes', 'totem_buffer_minutes', 'totem_default_duration',
+            'totem_min_duration', 'totem_max_duration', 'totem_advance_minutes',
+            'totem_require_email', 'totem_refresh_seconds', 'totem_logo',
+            'smtp_enabled', 'smtp_host', 'smtp_port', 'smtp_encryption',
+            'smtp_username', 'smtp_password', 'smtp_from_email', 'smtp_from_name',
+            'webhook_enabled', 'webhook_url',
         ];
 
         $config = [];
@@ -43,9 +48,12 @@ class TotemAdminController extends Controller
             $config[$key] = $this->settingModel->getValue($key);
         }
 
+        $sellerModel = new Seller();
+
         $this->view('admin/totem', [
-            'config' => $config,
-            'rooms'  => $this->roomModel->allOrdered(),
+            'config'  => $config,
+            'rooms'   => $this->roomModel->allOrdered(),
+            'sellers' => $sellerModel->allOrdered(),
         ]);
     }
 
@@ -93,25 +101,95 @@ class TotemAdminController extends Controller
             }
         }
 
-        $this->settingModel->saveMultiple([
+        $settings = [
             'totem_enabled'         => $this->input('totem_enabled', '0'),
             'totem_pin'             => $pin,
             'totem_open_time'       => $this->input('totem_open_time', '08:00'),
             'totem_close_time'      => $this->input('totem_close_time', '18:00'),
             'totem_slot_minutes'    => (int) $this->input('totem_slot_minutes', 30),
+            'totem_buffer_minutes'  => (int) $this->input('totem_buffer_minutes', 0),
             'totem_default_duration'=> (int) $this->input('totem_default_duration', 30),
             'totem_min_duration'    => (int) $this->input('totem_min_duration', 30),
             'totem_max_duration'    => (int) $this->input('totem_max_duration', 120),
             'totem_advance_minutes' => (int) $this->input('totem_advance_minutes', 0),
             'totem_require_email'   => $this->input('totem_require_email', '0'),
             'totem_refresh_seconds' => (int) $this->input('totem_refresh_seconds', 15),
-        ]);
+            // Notificações
+            'smtp_enabled'          => $this->input('smtp_enabled', '0'),
+            'smtp_host'             => trim((string) $this->input('smtp_host', '')),
+            'smtp_port'             => (int) $this->input('smtp_port', 587),
+            'smtp_encryption'       => $this->input('smtp_encryption', 'tls'),
+            'smtp_username'         => trim((string) $this->input('smtp_username', '')),
+            'smtp_from_email'       => trim((string) $this->input('smtp_from_email', '')),
+            'smtp_from_name'        => trim((string) $this->input('smtp_from_name', '')),
+            'webhook_enabled'       => $this->input('webhook_enabled', '0'),
+            'webhook_url'           => trim((string) $this->input('webhook_url', '')),
+        ];
+
+        // Senha SMTP: só atualiza se preenchida (evita apagar ao salvar)
+        $smtpPass = (string) $this->input('smtp_password', '');
+        if ($smtpPass !== '') {
+            $settings['smtp_password'] = $smtpPass;
+        }
+
+        // Upload do logo (PNG)
+        $logoPath = $this->handleImageUpload('totem_logo', 'logo');
+        if ($logoPath !== null) {
+            $settings['totem_logo'] = $logoPath;
+        }
+
+        $this->settingModel->saveMultiple($settings);
 
         $log = new ActivityLog();
         $log->log('totem.settings_updated', 'settings', null, 'Configurações do Totem atualizadas');
 
         Session::flash('success', 'Configurações do Totem salvas com sucesso!');
         $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Faz upload de uma imagem PNG e retorna o caminho público (/uploads/...).
+     * Retorna null se nenhum arquivo foi enviado.
+     */
+    private function handleImageUpload(string $field, string $prefix): ?string
+    {
+        if (empty($_FILES[$field]) || ($_FILES[$field]['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        $file = $_FILES[$field];
+        if ($file['error'] !== UPLOAD_ERR_OK) {
+            Session::flash('error', 'Falha no upload da imagem.');
+            return null;
+        }
+
+        // Valida tipo real (PNG)
+        $info = @getimagesize($file['tmp_name']);
+        if ($info === false || ($info['mime'] ?? '') !== 'image/png') {
+            Session::flash('error', 'A imagem deve ser um arquivo PNG.');
+            return null;
+        }
+
+        // Limite de 4 MB
+        if ($file['size'] > 4 * 1024 * 1024) {
+            Session::flash('error', 'A imagem não pode exceder 4 MB.');
+            return null;
+        }
+
+        $dir = __DIR__ . '/../../public/uploads';
+        if (!is_dir($dir)) {
+            @mkdir($dir, 0775, true);
+        }
+
+        $filename = $prefix . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(4)) . '.png';
+        $dest = $dir . '/' . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $dest)) {
+            Session::flash('error', 'Não foi possível salvar a imagem.');
+            return null;
+        }
+
+        return '/uploads/' . $filename;
     }
 
     /**
@@ -134,7 +212,7 @@ class TotemAdminController extends Controller
             return;
         }
 
-        $id = $this->roomModel->create([
+        $data = [
             'name'          => $name,
             'description'   => trim((string) $this->input('description', '')) ?: null,
             'icon'          => trim((string) $this->input('icon', 'bi-easel')) ?: 'bi-easel',
@@ -142,7 +220,14 @@ class TotemAdminController extends Controller
             'active'        => $this->input('active', '0') === '1' ? 1 : 0,
             'show_in_totem' => $this->input('show_in_totem', '0') === '1' ? 1 : 0,
             'sort_order'    => (int) $this->input('sort_order', 0),
-        ]);
+        ];
+
+        $img = $this->handleImageUpload('image', 'room');
+        if ($img !== null) {
+            $data['image_path'] = $img;
+        }
+
+        $id = $this->roomModel->create($data);
 
         $log = new ActivityLog();
         $log->log('room.created', 'room', $id, "Sala '{$name}' criada");
@@ -178,7 +263,7 @@ class TotemAdminController extends Controller
             return;
         }
 
-        $this->roomModel->update((int) $id, [
+        $data = [
             'name'          => $name,
             'description'   => trim((string) $this->input('description', '')) ?: null,
             'icon'          => trim((string) $this->input('icon', 'bi-easel')) ?: 'bi-easel',
@@ -186,7 +271,17 @@ class TotemAdminController extends Controller
             'active'        => $this->input('active', '0') === '1' ? 1 : 0,
             'show_in_totem' => $this->input('show_in_totem', '0') === '1' ? 1 : 0,
             'sort_order'    => (int) $this->input('sort_order', 0),
-        ]);
+        ];
+
+        if ($this->input('remove_image', '0') === '1') {
+            $data['image_path'] = null;
+        }
+        $img = $this->handleImageUpload('image', 'room');
+        if ($img !== null) {
+            $data['image_path'] = $img;
+        }
+
+        $this->roomModel->update((int) $id, $data);
 
         $log = new ActivityLog();
         $log->log('room.updated', 'room', (int) $id, "Sala '{$name}' atualizada");
@@ -362,5 +457,127 @@ class TotemAdminController extends Controller
 
         Session::flash('success', 'Item excluído com sucesso!');
         $this->redirect("/admin/totem/rooms/{$roomId}/items");
+    }
+
+    /**
+     * Cria um vendedor.
+     */
+    public function storeSeller(): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $name = trim((string) $this->input('name', ''));
+        if ($name === '') {
+            Session::flash('error', 'O nome do vendedor é obrigatório.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $sellerModel = new Seller();
+        $id = $sellerModel->create([
+            'name'       => $name,
+            'email'      => trim((string) $this->input('email', '')) ?: null,
+            'phone'      => trim((string) $this->input('phone', '')) ?: null,
+            'active'     => $this->input('active', '0') === '1' ? 1 : 0,
+            'sort_order' => (int) $this->input('sort_order', 0),
+        ]);
+
+        $log = new ActivityLog();
+        $log->log('seller.created', 'seller', $id, "Vendedor '{$name}' criado");
+
+        Session::flash('success', 'Vendedor adicionado com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Atualiza um vendedor.
+     */
+    public function updateSeller(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $sellerModel = new Seller();
+        $seller = $sellerModel->find((int) $id);
+        if (!$seller) {
+            Session::flash('error', 'Vendedor não encontrado.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $name = trim((string) $this->input('name', ''));
+        if ($name === '') {
+            Session::flash('error', 'O nome do vendedor é obrigatório.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $sellerModel->update((int) $id, [
+            'name'       => $name,
+            'email'      => trim((string) $this->input('email', '')) ?: null,
+            'phone'      => trim((string) $this->input('phone', '')) ?: null,
+            'active'     => $this->input('active', '0') === '1' ? 1 : 0,
+            'sort_order' => (int) $this->input('sort_order', 0),
+        ]);
+
+        $log = new ActivityLog();
+        $log->log('seller.updated', 'seller', (int) $id, "Vendedor '{$name}' atualizado");
+
+        Session::flash('success', 'Vendedor atualizado com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Exclui um vendedor.
+     */
+    public function deleteSeller(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $sellerModel = new Seller();
+        $seller = $sellerModel->find((int) $id);
+        if (!$seller) {
+            Session::flash('error', 'Vendedor não encontrado.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $sellerModel->delete((int) $id);
+
+        $log = new ActivityLog();
+        $log->log('seller.deleted', 'seller', (int) $id, "Vendedor '{$seller->name}' excluído");
+
+        Session::flash('success', 'Vendedor excluído com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Aba "Logs de Envio" — histórico de e-mails e webhooks.
+     */
+    public function logs(): void
+    {
+        $this->requireSuperAdmin();
+
+        $logModel = new NotificationLog();
+        $this->view('admin/totem_logs', [
+            'logs' => $logModel->getRecent(200),
+        ]);
     }
 }

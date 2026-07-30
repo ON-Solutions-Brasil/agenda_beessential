@@ -26,16 +26,24 @@ class Setting extends Model
      */
     public function setValue(string $key, mixed $value): bool
     {
-        $setting = $this->findBy('key_name', $key);
-        if (!$setting) {
-            return false;
-        }
-
         if (is_array($value)) {
             $value = json_encode($value);
         }
         if (is_bool($value)) {
             $value = $value ? '1' : '0';
+        }
+
+        $setting = $this->findBy('key_name', $key);
+
+        // Se a chave ainda não existe, cria (upsert) para não perder configuração.
+        if (!$setting) {
+            return $this->create([
+                'key_name'   => $key,
+                'value'      => (string) $value,
+                'type'       => 'text',
+                'group_name' => 'geral',
+                'label'      => $key,
+            ]) > 0;
         }
 
         return $this->update($setting->id, ['value' => (string) $value]);

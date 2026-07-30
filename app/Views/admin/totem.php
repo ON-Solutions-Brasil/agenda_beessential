@@ -2,13 +2,18 @@
 
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-easel me-2"></i>Configuração do Modo Totem</h2>
-    <a href="/totem" target="_blank" class="btn btn-outline-primary">
-        <i class="bi bi-box-arrow-up-right me-1"></i>Abrir Totem
-    </a>
+    <div class="d-flex gap-2">
+        <a href="/admin/totem/logs" class="btn btn-outline-secondary">
+            <i class="bi bi-envelope-paper me-1"></i>Logs de Envio
+        </a>
+        <a href="/totem" target="_blank" class="btn btn-outline-primary">
+            <i class="bi bi-box-arrow-up-right me-1"></i>Abrir Totem
+        </a>
+    </div>
 </div>
 
 <!-- Configurações gerais -->
-<form method="POST" action="/admin/totem/save" class="mb-4">
+<form method="POST" action="/admin/totem/save" class="mb-4" enctype="multipart/form-data">
     <?= View::csrf() ?>
     <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white"><strong>Acesso e Funcionamento</strong></div>
@@ -20,6 +25,18 @@
                         <option value="1" <?= $config['totem_enabled'] ? 'selected' : '' ?>>Ativado</option>
                         <option value="0" <?= !$config['totem_enabled'] ? 'selected' : '' ?>>Desativado</option>
                     </select>
+                </div>
+
+                <div class="col-md-8">
+                    <label class="form-label">Logo do Totem (PNG)</label>
+                    <div class="d-flex align-items-center gap-3">
+                        <?php if (!empty($config['totem_logo'])): ?>
+                        <img src="<?= View::escape((string)$config['totem_logo']) ?>" alt="Logo"
+                             style="height:42px;background:#111;padding:4px;border-radius:6px;">
+                        <?php endif; ?>
+                        <input type="file" class="form-control" name="totem_logo" accept="image/png">
+                    </div>
+                    <small class="text-muted">Substitui o ícone no topo do totem. Apenas PNG, até 4 MB.</small>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">PIN de Acesso (4 dígitos)</label>
@@ -46,6 +63,12 @@
                     <label class="form-label">Intervalo das Janelas (min)</label>
                     <input type="number" class="form-control" name="totem_slot_minutes" min="5" max="240"
                            value="<?= View::escape((string)($config['totem_slot_minutes'] ?? 30)) ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Intervalo entre Reservas (min)</label>
+                    <input type="number" class="form-control" name="totem_buffer_minutes" min="0" max="120"
+                           value="<?= View::escape((string)($config['totem_buffer_minutes'] ?? 0)) ?>">
+                    <small class="text-muted">Folga p/ limpeza e deslocamento</small>
                 </div>
                 <div class="col-md-3">
                     <label class="form-label">Antecedência Mínima (min)</label>
@@ -81,7 +104,141 @@
             <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar Configurações</button>
         </div>
     </div>
+
+    <!-- Notificações: SMTP + Webhook -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white"><strong>Notificações (E-mail e Webhook)</strong></div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Envio de E-mail</label>
+                    <select class="form-select" name="smtp_enabled">
+                        <option value="1" <?= $config['smtp_enabled'] ? 'selected' : '' ?>>Ativado</option>
+                        <option value="0" <?= !$config['smtp_enabled'] ? 'selected' : '' ?>>Desativado</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Servidor SMTP</label>
+                    <input type="text" class="form-control" name="smtp_host"
+                           value="<?= View::escape((string)($config['smtp_host'] ?? '')) ?>" placeholder="smtp.gmail.com">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Porta</label>
+                    <input type="number" class="form-control" name="smtp_port"
+                           value="<?= View::escape((string)($config['smtp_port'] ?? 587)) ?>">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Criptografia</label>
+                    <select class="form-select" name="smtp_encryption">
+                        <?php $enc = (string)($config['smtp_encryption'] ?? 'tls'); ?>
+                        <option value="tls" <?= $enc==='tls'?'selected':'' ?>>TLS</option>
+                        <option value="ssl" <?= $enc==='ssl'?'selected':'' ?>>SSL</option>
+                        <option value="" <?= $enc===''?'selected':'' ?>>Nenhuma</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Usuário SMTP</label>
+                    <input type="text" class="form-control" name="smtp_username"
+                           value="<?= View::escape((string)($config['smtp_username'] ?? '')) ?>">
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label">Senha SMTP</label>
+                    <input type="password" class="form-control" name="smtp_password"
+                           placeholder="<?= !empty($config['smtp_password']) ? '•••••••• (mantém a atual)' : '' ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">E-mail Remetente</label>
+                    <input type="email" class="form-control" name="smtp_from_email"
+                           value="<?= View::escape((string)($config['smtp_from_email'] ?? '')) ?>">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Nome Remetente</label>
+                    <input type="text" class="form-control" name="smtp_from_name"
+                           value="<?= View::escape((string)($config['smtp_from_name'] ?? '')) ?>">
+                </div>
+
+                <div class="col-12"><hr class="my-1"></div>
+                <div class="col-md-3">
+                    <label class="form-label">Webhook</label>
+                    <select class="form-select" name="webhook_enabled">
+                        <option value="1" <?= $config['webhook_enabled'] ? 'selected' : '' ?>>Ativado</option>
+                        <option value="0" <?= !$config['webhook_enabled'] ? 'selected' : '' ?>>Desativado</option>
+                    </select>
+                </div>
+                <div class="col-md-9">
+                    <label class="form-label">URL do Webhook</label>
+                    <input type="url" class="form-control" name="webhook_url"
+                           value="<?= View::escape((string)($config['webhook_url'] ?? '')) ?>"
+                           placeholder="https://seu-endpoint.com/webhook">
+                    <small class="text-muted">Recebe um POST JSON com os dados da reserva (vendedor + visitante).</small>
+                </div>
+            </div>
+        </div>
+        <div class="card-footer bg-white">
+            <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>Salvar Configurações</button>
+        </div>
+    </div>
 </form>
+
+<!-- Vendedores -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>Vendedores</strong>
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#sellerModal"
+                onclick="prepareSellerModal()">
+            <i class="bi bi-plus-lg me-1"></i>Novo Vendedor
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ordem</th><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ativo</th>
+                        <th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($sellers)): ?>
+                    <tr><td colspan="6" class="text-center text-muted py-4">Nenhum vendedor cadastrado.</td></tr>
+                    <?php else: foreach ($sellers as $seller): ?>
+                    <tr>
+                        <td><?= (int)$seller->sort_order ?></td>
+                        <td><strong><?= View::escape($seller->name) ?></strong></td>
+                        <td class="small text-muted"><?= View::escape($seller->email ?? '-') ?></td>
+                        <td class="small text-muted"><?= View::escape($seller->phone ?? '-') ?></td>
+                        <td>
+                            <?php if ((int)$seller->active === 1): ?>
+                            <span class="badge bg-success">Sim</span>
+                            <?php else: ?>
+                            <span class="badge bg-secondary">Não</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick='editSeller(<?= json_encode([
+                                        "id" => (int)$seller->id,
+                                        "name" => $seller->name,
+                                        "email" => $seller->email,
+                                        "phone" => $seller->phone,
+                                        "active" => (int)$seller->active,
+                                        "sort_order" => (int)$seller->sort_order,
+                                    ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" action="/admin/totem/sellers/<?= (int)$seller->id ?>/delete"
+                                  class="d-inline" onsubmit="return confirm('Excluir este vendedor?');">
+                                <?= View::csrf() ?>
+                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <!-- Gestão de salas -->
 <div class="card border-0 shadow-sm mb-4">
@@ -145,6 +302,7 @@
                                         "name" => $room->name,
                                         "description" => $room->description,
                                         "icon" => $room->icon,
+                                        "image_path" => $room->image_path ?? null,
                                         "capacity" => $room->capacity,
                                         "active" => (int)$room->active,
                                         "show_in_totem" => (int)$room->show_in_totem,
@@ -170,7 +328,7 @@
 <div class="modal fade" id="roomModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" id="roomForm" action="/admin/totem/rooms/store">
+            <form method="POST" id="roomForm" action="/admin/totem/rooms/store" enctype="multipart/form-data">
                 <?= View::csrf() ?>
                 <div class="modal-header">
                     <h5 class="modal-title" id="roomModalTitle">Nova Sala</h5>
@@ -186,8 +344,17 @@
                             <label class="form-label">Descrição</label>
                             <input type="text" class="form-control" name="description" id="roomDescription">
                         </div>
+                        <div class="col-12">
+                            <label class="form-label">Imagem da Sala (PNG)</label>
+                            <input type="file" class="form-control" name="image" id="roomImage" accept="image/png">
+                            <small class="text-muted">Se enviada, substitui o ícone no card. PNG até 4 MB.</small>
+                            <div class="form-check mt-2 d-none" id="removeImageWrap">
+                                <input class="form-check-input" type="checkbox" name="remove_image" value="1" id="roomRemoveImage">
+                                <label class="form-check-label" for="roomRemoveImage">Remover imagem atual</label>
+                            </div>
+                        </div>
                         <div class="col-md-6">
-                            <label class="form-label">Ícone (Bootstrap Icons)</label>
+                            <label class="form-label">Ícone (fallback, Bootstrap Icons)</label>
                             <input type="text" class="form-control" name="icon" id="roomIcon" value="bi-easel"
                                    placeholder="bi-easel">
                         </div>
@@ -224,6 +391,52 @@
     </div>
 </div>
 
+<!-- Modal de vendedor -->
+<div class="modal fade" id="sellerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="sellerForm" action="/admin/totem/sellers/store">
+                <?= View::csrf() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sellerModalTitle">Novo Vendedor</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Nome <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="sellerName" required>
+                        </div>
+                        <div class="col-md-7">
+                            <label class="form-label">E-mail (recebe notificação)</label>
+                            <input type="email" class="form-control" name="email" id="sellerEmail">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">Telefone</label>
+                            <input type="text" class="form-control" name="phone" id="sellerPhone">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ordem</label>
+                            <input type="number" class="form-control" name="sort_order" id="sellerSortOrder" value="0">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ativo</label>
+                            <select class="form-select" name="active" id="sellerActive">
+                                <option value="1">Sim</option>
+                                <option value="0">Não</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
 function prepareRoomModal() {
     document.getElementById('roomModalTitle').textContent = 'Nova Sala';
@@ -235,6 +448,9 @@ function prepareRoomModal() {
     document.getElementById('roomSortOrder').value = '0';
     document.getElementById('roomActive').value = '1';
     document.getElementById('roomShowInTotem').value = '1';
+    document.getElementById('roomImage').value = '';
+    document.getElementById('roomRemoveImage').checked = false;
+    document.getElementById('removeImageWrap').classList.add('d-none');
 }
 
 function editRoom(room) {
@@ -247,6 +463,30 @@ function editRoom(room) {
     document.getElementById('roomSortOrder').value = room.sort_order || 0;
     document.getElementById('roomActive').value = String(room.active);
     document.getElementById('roomShowInTotem').value = String(room.show_in_totem);
+    document.getElementById('roomImage').value = '';
+    document.getElementById('roomRemoveImage').checked = false;
+    document.getElementById('removeImageWrap').classList.toggle('d-none', !room.image_path);
     new bootstrap.Modal(document.getElementById('roomModal')).show();
+}
+
+function prepareSellerModal() {
+    document.getElementById('sellerModalTitle').textContent = 'Novo Vendedor';
+    document.getElementById('sellerForm').action = '/admin/totem/sellers/store';
+    document.getElementById('sellerName').value = '';
+    document.getElementById('sellerEmail').value = '';
+    document.getElementById('sellerPhone').value = '';
+    document.getElementById('sellerSortOrder').value = '0';
+    document.getElementById('sellerActive').value = '1';
+}
+
+function editSeller(seller) {
+    document.getElementById('sellerModalTitle').textContent = 'Editar Vendedor';
+    document.getElementById('sellerForm').action = '/admin/totem/sellers/' + seller.id + '/update';
+    document.getElementById('sellerName').value = seller.name || '';
+    document.getElementById('sellerEmail').value = seller.email || '';
+    document.getElementById('sellerPhone').value = seller.phone || '';
+    document.getElementById('sellerSortOrder').value = seller.sort_order || 0;
+    document.getElementById('sellerActive').value = String(seller.active);
+    new bootstrap.Modal(document.getElementById('sellerModal')).show();
 }
 </script>

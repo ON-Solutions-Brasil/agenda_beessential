@@ -4,8 +4,10 @@
    =================================================== */
 
 :root {
-    --totem-primary: #667eea;
-    --totem-primary-2: #764ba2;
+    --totem-primary: #FFC107;      /* amarelo */
+    --totem-primary-2: #FFA000;    /* amarelo escuro */
+    --totem-dark: #111111;         /* preto */
+    --totem-dark-2: #1e1e1e;
     --totem-available: #16a34a;
     --totem-occupied: #dc2626;
     --totem-soon: #f59e0b;
@@ -30,22 +32,34 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, var(--totem-primary) 0%, var(--totem-primary-2) 100%);
+    background: radial-gradient(circle at top, var(--totem-dark-2) 0%, var(--totem-dark) 70%);
     padding: 1rem;
 }
 
 .totem-pin-card {
-    background: #fff;
+    background: var(--totem-dark-2);
+    border: 1px solid #2a2a2a;
+    border-top: 4px solid var(--totem-primary);
     border-radius: 1.5rem;
     padding: 2.5rem 2rem;
     width: 100%;
     max-width: 420px;
-    box-shadow: 0 1.5rem 3rem rgba(0,0,0,.25);
+    box-shadow: 0 1.5rem 3rem rgba(0,0,0,.5);
+    color: #fff;
 }
+
+.totem-pin-card h2 { color: #fff; }
+.totem-pin-card .text-muted { color: #9ca3af !important; }
 
 .totem-pin-logo {
     font-size: 3.5rem;
     color: var(--totem-primary);
+}
+
+.totem-pin-logo-img {
+    max-height: 72px;
+    max-width: 200px;
+    object-fit: contain;
 }
 
 .totem-pin-display {
@@ -54,10 +68,11 @@
     font-size: 2.5rem;
     letter-spacing: 1rem;
     padding: .75rem;
-    border: 2px solid #e2e8f0;
+    border: 2px solid #333;
     border-radius: .75rem;
     margin-bottom: 1.5rem;
-    background: #f8fafc;
+    background: #111;
+    color: var(--totem-primary);
     font-weight: 700;
 }
 
@@ -73,20 +88,21 @@
     padding: 1.25rem;
     border: none;
     border-radius: 1rem;
-    background: #f1f5f9;
-    color: #1e293b;
+    background: #2c2c2c;
+    color: #fff;
     cursor: pointer;
     transition: transform .1s, background .15s;
 }
 
 .totem-key:active {
     transform: scale(.94);
-    background: #e2e8f0;
+    background: var(--totem-primary);
+    color: var(--totem-dark);
 }
 
 .totem-key-action {
-    background: #e2e8f0;
-    color: #64748b;
+    background: #1a1a1a;
+    color: var(--totem-primary);
 }
 
 .totem-btn-lg {
@@ -96,24 +112,41 @@
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    background: var(--totem-primary);
     border: none;
+    color: var(--totem-dark);
+    font-weight: 700;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background: var(--totem-primary-2);
+    color: var(--totem-dark);
+}
+
+.totem-logo {
+    height: 42px;
+    width: auto;
+    max-width: 160px;
+    object-fit: contain;
 }
 
 /* ─── Cabeçalho ────────────────────────────────────── */
 
 .totem-header {
-    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    background: var(--totem-dark);
     color: #fff;
     padding: 1.25rem 1.75rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 2px 12px rgba(0,0,0,.15);
+    box-shadow: 0 2px 12px rgba(0,0,0,.25);
+    border-bottom: 3px solid var(--totem-primary);
     position: sticky;
     top: 0;
     z-index: 10;
 }
+
+.totem-header .bi { color: var(--totem-primary); }
+.totem-clock { color: var(--totem-primary); }
 
 .totem-title { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
 .totem-subtitle { font-size: .95rem; opacity: .85; text-transform: capitalize; }
@@ -125,22 +158,37 @@
 .totem-main { padding: 1.75rem; }
 
 .totem-rooms {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-width: 820px;
+    margin: 0 auto;
 }
 
 .totem-room-card {
     background: #fff;
-    border-radius: 1.25rem;
-    padding: 1.75rem;
+    border-radius: 1rem;
+    padding: 1.25rem 1.5rem 1.25rem 2rem;
     cursor: pointer;
-    border: 3px solid transparent;
-    box-shadow: 0 4px 16px rgba(0,0,0,.06);
-    transition: transform .12s, box-shadow .12s;
+    border: 2px solid #eef1f8;
+    box-shadow: 0 2px 10px rgba(0,0,0,.05);
+    transition: transform .12s, box-shadow .12s, border-color .12s;
     position: relative;
     overflow: hidden;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-areas: "visual name status" "visual info info";
+    align-items: center;
+    column-gap: 1.25rem;
+    row-gap: .25rem;
 }
+
+.totem-room-card:hover { border-color: var(--totem-primary); }
+.totem-room-card .totem-room-visual { grid-area: visual; height: 56px; margin: 0; }
+.totem-room-card .totem-room-name { grid-area: name; }
+.totem-room-card .totem-room-capacity { display: none; }
+.totem-room-card .totem-status-badge { grid-area: status; justify-self: end; }
+.totem-room-card .totem-room-info { grid-area: info; margin-top: 0; }
 
 .totem-room-card:active { transform: scale(.98); }
 
@@ -148,17 +196,31 @@
     content: '';
     position: absolute;
     top: 0; left: 0;
-    width: 100%; height: 8px;
+    width: 8px; height: 100%;
 }
 
 .totem-room-card.status-available::before { background: var(--totem-available); }
 .totem-room-card.status-occupied::before { background: var(--totem-occupied); }
 .totem-room-card.status-soon::before { background: var(--totem-soon); }
 
+.totem-room-visual {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    height: 68px;
+    margin-bottom: .5rem;
+}
+
 .totem-room-icon {
     font-size: 3rem;
-    color: var(--totem-primary);
+    color: var(--totem-dark);
     margin-bottom: .5rem;
+}
+
+.totem-room-img {
+    max-height: 68px;
+    max-width: 120px;
+    object-fit: contain;
 }
 
 .totem-room-name { font-size: 1.4rem; font-weight: 700; color: #1e293b; }
@@ -209,13 +271,15 @@
 .totem-panel.show { transform: translateX(0); }
 
 .totem-panel-header {
-    background: linear-gradient(135deg, var(--totem-primary), var(--totem-primary-2));
+    background: var(--totem-dark);
     color: #fff;
     padding: 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    border-bottom: 3px solid var(--totem-primary);
 }
+.totem-panel-status { color: var(--totem-primary); }
 .totem-panel-title { font-size: 1.5rem; font-weight: 700; }
 .totem-panel-status { font-size: 1rem; opacity: .9; margin-top: .25rem; }
 
@@ -386,8 +450,20 @@
 .totem-slot.occupied {
     background: #fee2e2;
     color: #991b1b;
-    text-decoration: line-through;
-    opacity: .7;
+    opacity: .85;
+}
+
+.totem-slot.occupied.clickable {
+    cursor: pointer;
+    border-color: #fca5a5;
+}
+.totem-slot.occupied.clickable:active { transform: scale(.95); }
+.totem-slot.occupied.clickable::after {
+    content: '\F4CB';
+    font-family: 'bootstrap-icons';
+    font-size: .7rem;
+    display: block;
+    opacity: .6;
 }
 
 .totem-slot.past {
@@ -458,8 +534,53 @@
 .totem-duration-chip.active {
     background: var(--totem-primary);
     border-color: var(--totem-primary);
+    color: var(--totem-dark);
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(255,193,7,.4);
+}
+
+/* ─── Modal de edição ──────────────────────────────── */
+
+.totem-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.55);
+    z-index: 40;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+}
+.totem-modal.show { display: flex; }
+
+.totem-modal-card {
+    background: #fff;
+    border-radius: 1.25rem;
+    width: 100%;
+    max-width: 440px;
+    max-height: 92vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: totemPop .25s ease;
+}
+
+.totem-modal-header {
+    background: var(--totem-dark);
     color: #fff;
-    box-shadow: 0 4px 12px rgba(102,126,234,.35);
+    padding: 1.25rem 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-bottom: 3px solid var(--totem-primary);
+}
+.totem-modal-header .bi { color: var(--totem-primary); }
+
+.totem-modal-body {
+    padding: 1.5rem;
+    overflow-y: auto;
 }
 
 .totem-duration-empty {
@@ -512,9 +633,13 @@
 }
 
 @media (max-width: 640px) {
-    .totem-rooms { grid-template-columns: 1fr; }
     .totem-clock { font-size: 1.5rem; }
     .totem-panel { max-width: 100%; }
+    .totem-room-card {
+        grid-template-columns: auto 1fr;
+        grid-template-areas: "visual name" "visual status" "info info";
+    }
+    .totem-room-card .totem-status-badge { justify-self: start; }
 }
 
 /* ─── Estado de erro de carregamento ───────────────── */

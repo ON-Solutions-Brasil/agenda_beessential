@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Core\Controller;
 use App\Core\Auth;
 use App\Models\Meeting;
+use App\Models\RoomReservation;
 
 class CalendarController extends Controller
 {
@@ -46,7 +47,7 @@ class CalendarController extends Controller
         $events = [];
         foreach ($meetings as $meeting) {
             $events[] = [
-                'id'              => $meeting->id,
+                'id'              => 'm' . $meeting->id,
                 'title'           => $meeting->title,
                 'start'           => $meeting->meeting_date . 'T' . $meeting->start_time,
                 'end'             => $meeting->meeting_date . 'T' . $meeting->end_time,
@@ -57,6 +58,31 @@ class CalendarController extends Controller
                     'status'     => $meeting->status,
                     'meet_link'  => $meeting->meet_link,
                     'location'   => $meeting->location,
+                ],
+            ];
+        }
+
+        // Reservas de salas feitas pelo totem
+        $reservationModel = new RoomReservation();
+        $reservations = $reservationModel->getByPeriodWithRoom($start, $end);
+        foreach ($reservations as $r) {
+            $title = $r->room_name . ' — ' . $r->customer_name;
+            $events[] = [
+                'id'            => 'r' . $r->id,
+                'title'         => $title,
+                'start'         => $r->reservation_date . 'T' . $r->start_time,
+                'end'           => $r->reservation_date . 'T' . $r->end_time,
+                'color'         => '#111111',
+                'textColor'     => '#FFC107',
+                'extendedProps' => [
+                    'tipo'      => 'Reserva de Sala (Totem)',
+                    'sala'      => $r->room_name,
+                    'visitante' => $r->customer_name,
+                    'telefone'  => $r->customer_phone,
+                    'email'     => $r->customer_email,
+                    'vendedor'  => $r->seller_name,
+                    'interesse' => $r->interest,
+                    'status'    => $r->status,
                 ],
             ];
         }

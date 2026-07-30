@@ -9,6 +9,25 @@ class RoomReservation extends Model
     protected string $table = 'room_reservations';
 
     /**
+     * Busca reserva pelo id da janela (sala + data + horário de início).
+     */
+    public function findSlot(int $roomId, string $date, string $startTime): ?object
+    {
+        $sql = "SELECT * FROM {$this->table}
+                WHERE room_id = :room_id
+                AND reservation_date = :date
+                AND start_time = :start_time
+                AND status != 'cancelled'
+                ORDER BY id DESC LIMIT 1";
+        $result = $this->db()->query($sql, [
+            'room_id'    => $roomId,
+            'date'       => $date,
+            'start_time' => $startTime,
+        ]);
+        return $result[0] ?? null;
+    }
+
+    /**
      * Reservas ativas de uma sala em uma data (não canceladas).
      */
     public function getByRoomAndDate(int $roomId, string $date): array
@@ -33,6 +52,20 @@ class RoomReservation extends Model
                 AND r.status != 'cancelled'
                 ORDER BY r.start_time ASC";
         return $this->db()->query($sql, ['date' => $date]);
+    }
+
+    /**
+     * Reservas ativas em um período, com o nome da sala (para o calendário).
+     */
+    public function getByPeriodWithRoom(string $startDate, string $endDate): array
+    {
+        $sql = "SELECT r.*, rm.name AS room_name
+                FROM {$this->table} r
+                INNER JOIN rooms rm ON r.room_id = rm.id
+                WHERE r.reservation_date BETWEEN :start AND :end
+                AND r.status != 'cancelled'
+                ORDER BY r.reservation_date ASC, r.start_time ASC";
+        return $this->db()->query($sql, ['start' => $startDate, 'end' => $endDate]);
     }
 
     /**

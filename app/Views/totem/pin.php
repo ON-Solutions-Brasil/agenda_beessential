@@ -2,7 +2,11 @@
 <div class="totem-pin-wrapper">
     <div class="totem-pin-card">
         <div class="text-center mb-4">
+            <?php if (!empty($logo)): ?>
+            <img src="<?= View::escape($logo) ?>" alt="Logo" class="totem-pin-logo-img">
+            <?php else: ?>
             <i class="bi bi-easel totem-pin-logo"></i>
+            <?php endif; ?>
             <h2 class="mt-2 mb-1">Totem de Reservas</h2>
             <p class="text-muted mb-0">Digite o PIN de acesso</p>
         </div>
@@ -33,9 +37,5 @@
                 <i class="bi bi-unlock me-2"></i>Entrar
             </button>
         </form>
-
-        <div class="text-center mt-3">
-            <a href="/login" class="text-muted small"><i class="bi bi-arrow-left me-1"></i>Voltar ao login</a>
-        </div>
     </div>
 </div>

@@ -14,6 +14,7 @@
         'horarios' => 'Horários de Trabalho',
         'google' => 'Google API',
         'totem' => 'Modo Totem',
+        'notificacoes' => 'Notificações',
     ];
     ?>
 
@@ -30,7 +31,27 @@
                         <?= View::escape($setting->label) ?>
                     </label>
 
-                    <?php if ($setting->type === 'boolean'): ?>
+                    <?php if ($setting->key_name === 'work_days'): ?>
+                    <?php
+                        $selectedDays = json_decode($setting->value ?? '[]', true);
+                        if (!is_array($selectedDays)) { $selectedDays = []; }
+                        $selectedDays = array_map('strval', $selectedDays);
+                        $weekDays = [
+                            '0' => 'Domingo', '1' => 'Segunda', '2' => 'Terça', '3' => 'Quarta',
+                            '4' => 'Quinta', '5' => 'Sexta', '6' => 'Sábado',
+                        ];
+                    ?>
+                    <div class="d-flex flex-wrap gap-2">
+                        <?php foreach ($weekDays as $num => $label): ?>
+                        <label class="btn btn-sm <?= in_array($num, $selectedDays, true) ? 'btn-primary' : 'btn-outline-secondary' ?>">
+                            <input type="checkbox" class="d-none" name="settings[work_days][]" value="<?= $num ?>"
+                                   <?= in_array($num, $selectedDays, true) ? 'checked' : '' ?>
+                                   onchange="this.closest('label').classList.toggle('btn-primary', this.checked); this.closest('label').classList.toggle('btn-outline-secondary', !this.checked);">
+                            <?= $label ?>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php elseif ($setting->type === 'boolean'): ?>
                     <select class="form-select" id="setting_<?= $setting->key_name ?>" name="settings[<?= $setting->key_name ?>]">
                         <option value="1" <?= $setting->value ? 'selected' : '' ?>>Sim</option>
                         <option value="0" <?= !$setting->value ? 'selected' : '' ?>>Não</option>
