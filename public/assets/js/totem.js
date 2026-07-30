@@ -579,6 +579,109 @@ function initTotemDashboard() {
         return div.innerHTML;
     }
 
+    // Teclado virtual para uso no totem (touch)
+    initVirtualKeyboard();
+
     // Início
     loadRooms();
 }
+
+/* ─── Teclado virtual (touch) ────────────────────────── */
+function initVirtualKeyboard() {
+    const vk = document.getElementById('virtualKeyboard');
+    if (!vk) return;
+
+    const keysEl = document.getElementById('vkKeys');
+    const preview = document.getElementById('vkPreview');
+    let target = null;
+    let shift = false;
+
+    const layouts = {
+        text: [
+            ['1','2','3','4','5','6','7','8','9','0'],
+            ['q','w','e','r','t','y','u','i','o','p'],
+            ['a','s','d','f','g','h','j','k','l'],
+            ['shift','z','x','c','v','b','n','m','backspace'],
+            ['@','space','.','done']
+        ],
+        numeric: [
+            ['1','2','3'],
+            ['4','5','6'],
+            ['7','8','9'],
+            ['backspace','0','done']
+        ]
+    };
+
+    function layoutFor(el) {
+        const type = (el.getAttribute('type') || '').toLowerCase();
+        const inputmode = (el.getAttribute('inputmode') || '').toLowerCase();
+        if (type === 'tel' || inputmode === 'numeric') return 'numeric';
+        return 'text';
+    }
+
+    function render(mode) {
+        const rows = layouts[mode];
+        keysEl.className = 'totem-vk-keys ' + (mode === 'numeric' ? 'vk-numeric' : 'vk-text');
+        keysEl.innerHTML = rows.map(row =>
+            '<div class="totem-vk-row">' + row.map(k => {
+                let label = k, cls = 'totem-vk-key', val = k;
+                if (k === 'space') { label = 'espaço'; cls += ' vk-wide'; }
+                else if (k === 'backspace') { label = '<i class="bi bi-backspace"></i>'; cls += ' vk-action'; }
+                else if (k === 'shift') { label = '<i class="bi bi-arrow-up"></i>'; cls += ' vk-action'; }
+                else if (k === 'done') { label = 'OK'; cls += ' vk-done'; }
+                else if (mode === 'text') { label = shift ? k.toUpperCase() : k; }
+                return '<button type="button" class="' + cls + '" data-key="' + val + '">' + label + '</button>';
+            }).join('') + '</div>'
+        ).join('');
+    }
+
+    function open(el) {
+        target = el;
+        shift = false;
+        render(layoutFor(el));
+        vk.classList.add('show');
+        document.body.classList.add('vk-open');
+        updatePreview();
+    }
+
+    function close() {
+        vk.classList.remove('show');
+        document.body.classList.remove('vk-open');
+        target = null;
+    }
+
+    function updatePreview() {
+        if (!target) { preview.textContent = ''; return; }
+        preview.textContent = target.value || target.getAttribute('placeholder') || '';
+    }
+
+    function type(key) {
+        if (!target) return;
+        if (key === 'done') { target.blur(); close(); return; }
+        if (key === 'backspace') { target.value = target.value.slice(0, -1); }
+        else if (key === 'shift') { shift = !shift; render(layoutFor(target)); }
+        else if (key === 'space') { target.value += ' '; }
+        else { target.value += (shift ? key.toUpperCase() : key); if (shift) { shift = false; render(layoutFor(target)); } }
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        updatePreview();
+    }
+
+    keysEl.addEventListener('click', function (e) {
+        const btn = e.target.closest('.totem-vk-key');
+        if (btn) type(btn.getAttribute('data-key'));
+    });
+
+    document.getElementById('vkClose').addEventListener('click', function () {
+        if (target) target.blur();
+        close();
+    });
+
+    // Abre o teclado ao focar campos de texto dentro do totem
+    document.addEventListener('focusin', function (e) {
+        const el = e.target;
+        if (el.matches('input[type="text"], input[type="tel"], input[type="email"], input[type="search"], textarea')) {
+            open(el);
+        }
+    });
+}
+

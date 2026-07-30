@@ -254,15 +254,34 @@ class NotificationService
             return $read();
         };
 
-        $read(); // saudação
+        $greeting = $read(); // saudação (espera 220)
+        if (strpos($greeting, '220') === false) {
+            fclose($fp);
+            throw new \RuntimeException('Servidor não respondeu à conexão (esperado 220): ' . trim($greeting));
+        }
+
         $ehloHost = $_SERVER['SERVER_NAME'] ?? 'localhost';
         $cmd("EHLO {$ehloHost}");
 
         if ($enc === 'tls') {
-            $cmd('STARTTLS');
-            if (!stream_socket_enable_crypto($fp, true, STREAM_CRYPTO_METHOD_TLS_CLIENT | STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT)) {
+            $startResp = $cmd('STARTTLS');
+            // Só habilita a criptografia se o servidor confirmar (220)
+            if (strpos($startResp, '220') === false) {
                 fclose($fp);
-                throw new \RuntimeException('Falha ao iniciar TLS');
+                throw new \RuntimeException('Servidor recusou STARTTLS (verifique host/porta/criptografia): ' . trim($startResp));
+            }
+
+            $crypto = STREAM_CRYPTO_METHOD_TLS_CLIENT;
+            if (defined('STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT')) {
+                $crypto |= STREAM_CRYPTO_METHOD_TLSv1_2_CLIENT;
+            }
+            if (defined('STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT')) {
+                $crypto |= STREAM_CRYPTO_METHOD_TLSv1_3_CLIENT;
+            }
+
+            if (!@stream_socket_enable_crypto($fp, true, $crypto)) {
+                fclose($fp);
+                throw new \RuntimeException('Falha ao iniciar TLS. Se a porta for 465, use criptografia SSL em vez de TLS.');
             }
             $cmd("EHLO {$ehloHost}");
         }

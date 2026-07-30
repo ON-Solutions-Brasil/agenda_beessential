@@ -311,9 +311,7 @@ class TotemController extends Controller
             'description' => $it->description,
         ], $itemModel->getActiveByRoom($roomId));
 
-        // Notificações (e-mail + webhook). Falhas não bloqueiam a reserva.
-        $notifier = new NotificationService();
-        $notifier->notifyReservation([
+        $notificationData = [
             'reservation_id' => $id,
             'room'           => $room->name,
             'date'           => date('d/m/Y', strtotime($date)),
@@ -328,9 +326,11 @@ class TotemController extends Controller
             'seller_phone'   => $seller ? ($seller->phone ?? null) : null,
             'interest'       => $interest,
             'items'          => $items,
-        ]);
+        ];
 
-        $this->json([
+        // Responde imediatamente ao totem e envia notificações em segundo plano,
+        // para que SMTP/webhook lentos não travem a confirmação da reserva.
+        $this->jsonThenContinue([
             'success' => true,
             'message' => 'Reserva confirmada!',
             'reservation' => [
@@ -339,6 +339,11 @@ class TotemController extends Controller
                 'end'   => substr($endTime, 0, 5),
             ],
         ]);
+
+        // Notificações (e-mail + webhook). Falhas não bloqueiam a reserva.
+        $notifier = new NotificationService();
+        $notifier->notifyReservation($notificationData);
+        exit;
     }
 
     /**

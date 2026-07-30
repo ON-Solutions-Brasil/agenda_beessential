@@ -37,6 +37,32 @@ abstract class Controller
     }
 
     /**
+     * Envia a resposta JSON ao cliente e fecha a conexão, permitindo que o
+     * servidor continue processando tarefas lentas (e-mail, webhook) em segundo plano.
+     */
+    protected function jsonThenContinue(mixed $data, int $status = 200): void
+    {
+        ignore_user_abort(true);
+
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Connection: close');
+
+        $payload = json_encode($data, JSON_UNESCAPED_UNICODE);
+        header('Content-Length: ' . strlen($payload));
+
+        echo $payload;
+
+        // Descarrega o buffer e encerra a conexão com o navegador
+        if (function_exists('fastcgi_finish_request')) {
+            fastcgi_finish_request();
+        } else {
+            @ob_end_flush();
+            @flush();
+        }
+    }
+
+    /**
      * Obtém dados do POST.
      */
     protected function input(string $key, $default = null): mixed

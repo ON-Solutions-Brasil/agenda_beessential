@@ -123,9 +123,9 @@
 }
 
 .totem-logo {
-    height: 56px;
+    height: 44px;
     width: auto;
-    max-width: 240px;
+    max-width: 200px;
     object-fit: contain;
 }
 
@@ -154,9 +154,9 @@
     align-items: flex-start;
     gap: .15rem;
 }
-.totem-logo-icon { font-size: 2.75rem; color: var(--totem-primary); }
-.totem-title { font-size: 1.5rem; font-weight: 700; line-height: 1.15; margin-top: .35rem; }
-.totem-subtitle { font-size: .95rem; opacity: .85; text-transform: capitalize; }
+.totem-logo-icon { font-size: 2.25rem; color: var(--totem-primary); }
+.totem-title { font-size: 1.05rem; font-weight: 700; line-height: 1.15; margin-top: .35rem; }
+.totem-subtitle { font-size: .8rem; opacity: .8; text-transform: capitalize; }
 .totem-clock { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .totem-exit { border-radius: .75rem; padding: .5rem .75rem; }
 
@@ -687,4 +687,94 @@
 .totem-load-error-hint {
     font-size: .85rem;
     color: #94a3b8;
+}
+
+/* ─── Teclado virtual (touch) ──────────────────────── */
+
+.totem-vk {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: #1a1a1a;
+    border-top: 3px solid var(--totem-primary);
+    box-shadow: 0 -8px 24px rgba(0,0,0,.4);
+    transform: translateY(100%);
+    transition: transform .22s ease;
+    padding: .5rem .5rem 1rem;
+}
+.totem-vk.show { transform: translateY(0); }
+
+/* Empurra o conteúdo para não ficar escondido atrás do teclado */
+body.vk-open { padding-bottom: 46vh; }
+
+.totem-vk-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .35rem .5rem .6rem;
+}
+.totem-vk-preview {
+    color: var(--totem-primary);
+    font-size: 1rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 85%;
+}
+.totem-vk-close {
+    background: #2c2c2c;
+    color: #fff;
+    border: none;
+    border-radius: .6rem;
+    width: 44px;
+    height: 36px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.totem-vk-keys {
+    display: flex;
+    flex-direction: column;
+    gap: .4rem;
+    max-width: 900px;
+    margin: 0 auto;
+}
+.totem-vk-keys.vk-numeric { max-width: 360px; }
+
+.totem-vk-row {
+    display: flex;
+    gap: .4rem;
+    justify-content: center;
+}
+
+.totem-vk-key {
+    flex: 1;
+    min-width: 0;
+    height: 52px;
+    border: none;
+    border-radius: .6rem;
+    background: #2c2c2c;
+    color: #fff;
+    font-size: 1.2rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform .08s, background .12s;
+}
+.totem-vk-key:active {
+    transform: scale(.93);
+    background: var(--totem-primary);
+    color: var(--totem-dark);
+}
+.totem-vk-key.vk-wide { flex: 4; }
+.totem-vk-key.vk-action { background: #3a3a3a; color: var(--totem-primary); flex: 1.4; }
+.totem-vk-key.vk-done { background: var(--totem-primary); color: var(--totem-dark); flex: 1.4; }
+
+.vk-numeric .totem-vk-key { height: 60px; font-size: 1.5rem; }
+
+@media (max-width: 640px) {
+    body.vk-open { padding-bottom: 52vh; }
+    .totem-vk-key { height: 46px; font-size: 1rem; }
 }
