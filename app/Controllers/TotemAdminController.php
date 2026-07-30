@@ -580,4 +580,160 @@ class TotemAdminController extends Controller
             'logs' => $logModel->getRecent(200),
         ]);
     }
+
+    /**
+     * Reenvia uma notificação a partir de um registro do log.
+     * Remonta os dados da reserva original e registra o novo resultado no log.
+     */
+    public function resendLog(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        $logModel = new NotificationLog();
+        $log = $logModel->find((int) $id);
+        if (!$log) {
+            Session::flash('error', 'Registro de log não encontrado.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        $notifier = new \App\Services\NotificationService();
+
+        // Reconstrói os dados da reserva quando disponível
+        $data = $this->buildNotificationDataFromReservation($log->reservation_id ? (int) $log->reservation_id : null);
+
+        if ($log->channel === 'webhook') {
+            $data['reservation_id'] = $log->reservation_id ? (int) $log->reservation_id : null;
+            $ok = $notifier->sendWebhook($data);
+            Session::flash($ok ? 'success' : 'error', $ok ? 'Webhook reenviado com sucesso!' : 'Falha ao reenviar o webhook. Veja o novo registro no log.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        // E-mail: reenvia para o mesmo destinatário
+        if (empty($log->recipient)) {
+            Session::flash('error', 'Este registro não possui destinatário para reenvio.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        // Descobre se o destinatário é o vendedor ou o visitante para montar o corpo certo
+        $isSeller = isset($data['seller_email']) && $data['seller_email'] === $log->recipient;
+        $subject = (string) ($log->subject ?? 'Reenvio de notificação');
+
+        $body = $isSeller
+            ? $this->invokeBuild($notifier, 'buildSellerBody', $data)
+            : $this->invokeBuild($notifier, 'buildCustomerBody', $data);
+
+        $toName = $isSeller ? ($data['seller_name'] ?? '') : ($data['customer_name'] ?? '');
+
+        $ok = $notifier->sendEmail($log->recipient, (string) $toName, $subject, $body, $log->reservation_id ? (int) $log->reservation_id : null);
+
+        Session::flash($ok ? 'success' : 'error', $ok ? 'E-mail reenviado com sucesso!' : 'Falha ao reenviar o e-mail. Veja o novo registro no log.');
+        $this->redirect('/admin/totem/logs');
+    }
+
+    /**
+     * Envia um e-mail de teste para validar a configuração SMTP.
+     */
+    public function testEmail(): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        $to = trim((string) $this->input('test_email', ''));
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            Session::flash('error', 'Informe um e-mail válido para o teste.');
+            $this->redirect('/admin/totem/logs');
+            return;
+        }
+
+        $notifier = new \App\Services\NotificationService();
+        $body = '<div style="font-family:Arial,sans-serif;background:#111;color:#eee;padding:24px;border-radius:12px;">'
+            . '<h2 style="color:#FFC107;">Teste de SMTP</h2>'
+            . '<p>Este é um e-mail de teste do Totem de Reservas. Se você recebeu, o SMTP está configurado corretamente.</p>'
+            . '<p style="color:#FFC107;font-weight:bold;">Agenda Beessential</p></div>';
+
+        $ok = $notifier->sendEmail($to, 'Teste', 'Teste de configuração SMTP - Totem', $body);
+
+        Session::flash($ok ? 'success' : 'error', $ok
+            ? "E-mail de teste enviado para {$to}. Confira a caixa de entrada."
+            : 'Falha no envio de teste. Veja o motivo no log abaixo.');
+        $this->redirect('/admin/totem/logs');
+    }
+
+    /**
+     * Monta os dados de notificação a partir de uma reserva salva.
+     * Se a reserva não existir mais, retorna um conjunto mínimo.
+     */
+    private function buildNotificationDataFromReservation(?int $reservationId): array
+    {
+        if (!$reservationId) {
+            return [];
+        }
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $r = $reservationModel->find($reservationId);
+        if (!$r) {
+            return [];
+        }
+
+        $roomModel = new Room();
+        $room = $roomModel->find((int) $r->room_id);
+
+        $itemModel = new RoomItem();
+        $items = array_map(fn($it) => [
+            'name'        => $it->name,
+            'description' => $it->description,
+        ], $itemModel->getActiveByRoom((int) $r->room_id));
+
+        $sellerEmail = null;
+        $sellerPhone = null;
+        if (!empty($r->seller_id)) {
+            $sellerModel = new Seller();
+            $seller = $sellerModel->find((int) $r->seller_id);
+            if ($seller) {
+                $sellerEmail = $seller->email ?? null;
+                $sellerPhone = $seller->phone ?? null;
+            }
+        }
+
+        return [
+            'reservation_id' => (int) $r->id,
+            'room'           => $room ? $room->name : '',
+            'date'           => date('d/m/Y', strtotime($r->reservation_date)),
+            'start'          => substr($r->start_time, 0, 5),
+            'end'            => substr($r->end_time, 0, 5),
+            'customer_name'  => $r->customer_name,
+            'customer_phone' => $r->customer_phone,
+            'customer_email' => $r->customer_email,
+            'seller_id'      => $r->seller_id ? (int) $r->seller_id : null,
+            'seller_name'    => $r->seller_name,
+            'seller_email'   => $sellerEmail,
+            'seller_phone'   => $sellerPhone,
+            'interest'       => $r->interest ?? null,
+            'items'          => $items,
+        ];
+    }
+
+    /**
+     * Chama um método protegido de montagem de corpo do NotificationService.
+     */
+    private function invokeBuild(object $notifier, string $method, array $data): string
+    {
+        $ref = new \ReflectionMethod($notifier, $method);
+        $ref->setAccessible(true);
+        return (string) $ref->invoke($notifier, $data);
+    }
 }

@@ -87,4 +87,6 @@ return [
     'POST /admin/totem/sellers/{id}/update' => [TotemAdminController::class, 'updateSeller'],
     'POST /admin/totem/sellers/{id}/delete' => [TotemAdminController::class, 'deleteSeller'],
     'GET  /admin/totem/logs'                => [TotemAdminController::class, 'logs'],
+    'POST /admin/totem/logs/{id}/resend'    => [TotemAdminController::class, 'resendLog'],
+    'POST /admin/totem/logs/test'           => [TotemAdminController::class, 'testEmail'],
 ];
