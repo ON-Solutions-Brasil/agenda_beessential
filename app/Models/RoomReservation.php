@@ -70,9 +70,14 @@ class RoomReservation extends Model
                 WHERE room_id = :room_id
                 AND reservation_date = :date
                 AND status != 'cancelled'
-                AND start_time <= :time AND end_time > :time
+                AND start_time <= :time1 AND end_time > :time2
                 ORDER BY start_time ASC LIMIT 1";
-        $result = $this->db()->query($sql, ['room_id' => $roomId, 'date' => $date, 'time' => $time]);
+        $result = $this->db()->query($sql, [
+            'room_id' => $roomId,
+            'date'    => $date,
+            'time1'   => $time,
+            'time2'   => $time,
+        ]);
         return $result[0] ?? null;
     }
 
