@@ -69,10 +69,12 @@ class View
 
     /**
      * Gera URL para assets.
+     * Usa caminho absoluto de raiz para funcionar em qualquer domínio/host,
+     * já que o .htaccess serve /assets/ diretamente de public/assets/.
      */
     public static function asset(string $path): string
     {
-        return self::url('assets/' . ltrim($path, '/'));
+        return '/assets/' . ltrim($path, '/');
     }
 
     /**

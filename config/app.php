@@ -4,7 +4,7 @@
  */
 return [
     'name'     => 'Agenda Beessential',
-    'url'      => 'http://localhost/agenda_beessential',
+    'url'      => 'https://agenda.beessential.com.br',
     'timezone' => 'America/Sao_Paulo',
     'locale'   => 'pt_BR',
     'charset'  => 'UTF-8',
