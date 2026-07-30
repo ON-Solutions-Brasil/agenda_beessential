@@ -62,7 +62,13 @@
             <div class="totem-checklist-progress" id="checklistProgress" style="display:none;"></div>
         </div>
 
-        <h6 class="totem-section-title mt-3"><i class="bi bi-clock me-1"></i>Horários</h6>
+        <div class="totem-section-head mt-3">
+            <h6 class="totem-section-title mb-0"><i class="bi bi-clock me-1"></i>Horários</h6>
+            <div class="totem-panel-date">
+                <label for="panelDateInput"><i class="bi bi-calendar3 me-1"></i>Data:</label>
+                <input type="date" id="panelDateInput" min="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>">
+            </div>
+        </div>
         <div class="totem-slots" id="panelSlots"></div>
 
         <!-- Formulário de reserva -->

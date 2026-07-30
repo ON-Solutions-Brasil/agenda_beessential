@@ -133,6 +133,26 @@ function initTotemDashboard() {
         timer = setTimeout(loadRooms, refreshMs);
     }
 
+    // Recarrega os dados mantendo o painel da sala atual aberto e atualizado
+    function reloadKeepingPanel() {
+        const openRoomId = currentRoom ? currentRoom.id : null;
+        clearTimeout(timer);
+        const dateQs = selectedDate ? ('?date=' + encodeURIComponent(selectedDate)) : '';
+        fetch('/totem/rooms' + dateQs, { headers: { 'Accept': 'application/json' } })
+            .then(r => r.json())
+            .then(data => {
+                roomsData = data.rooms || [];
+                renderDate(data.date);
+                renderRooms(roomsData);
+                if (openRoomId) {
+                    const updated = roomsData.find(r => r.id === openRoomId);
+                    if (updated) refreshPanel(updated);
+                }
+            })
+            .catch(err => console.error('Erro ao recarregar:', err))
+            .finally(scheduleNext);
+    }
+
     function renderDate(dateStr) {
         const el = document.getElementById('totemDate');
         const d = new Date(dateStr + 'T00:00:00');
@@ -190,6 +210,9 @@ function initTotemDashboard() {
         checkedItems.clear();
         updateChecklistToggle();
         hideReserveForm();
+        // Sincroniza o seletor de data do painel com a data atual selecionada
+        const panelDate = document.getElementById('panelDateInput');
+        if (panelDate && selectedDate) panelDate.value = selectedDate;
         refreshPanel(room);
         panel.classList.add('show');
         overlay.classList.add('show');
@@ -601,6 +624,18 @@ function initTotemDashboard() {
             closePanel();
             clearTimeout(timer);
             loadRooms();
+        });
+    }
+
+    // Seletor de data dentro do painel lateral (mantém o painel aberto)
+    const panelDateInput = document.getElementById('panelDateInput');
+    if (panelDateInput) {
+        panelDateInput.addEventListener('change', function () {
+            selectedDate = this.value;
+            if (dateInput) dateInput.value = this.value; // sincroniza com o cabeçalho
+            selectedSlot = null;
+            hideReserveForm();
+            reloadKeepingPanel();
         });
     }
 

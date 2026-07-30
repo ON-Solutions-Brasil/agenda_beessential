@@ -811,3 +811,31 @@ body.vk-open { padding-bottom: 46vh; }
     cursor: pointer;
 }
 .totem-today-btn:active { transform: scale(.94); }
+
+/* ─── Seletor de data dentro do painel ─────────────── */
+
+.totem-panel-date {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    background: #f1f5f9;
+    padding: .3rem .6rem;
+    border-radius: .6rem;
+}
+.totem-panel-date label {
+    margin: 0;
+    font-size: .82rem;
+    font-weight: 600;
+    color: #475569;
+    display: flex;
+    align-items: center;
+}
+.totem-panel-date label .bi { color: var(--totem-primary-2); }
+.totem-panel-date input[type="date"] {
+    border: none;
+    background: transparent;
+    font-size: .85rem;
+    font-weight: 600;
+    color: #1e293b;
+    outline: none;
+}
