@@ -99,5 +99,8 @@ return [
     'POST /admin/totem/logs/test'           => [TotemAdminController::class, 'testEmail'],
     'GET  /admin/totem/reservations'        => [TotemAdminController::class, 'reservations'],
     'GET  /admin/totem/reservations/{id}'   => [TotemAdminController::class, 'reservationInfo'],
+    'POST /admin/totem/reservations/{id}/update' => [TotemAdminController::class, 'updateReservationAdmin'],
+    'POST /admin/totem/reservations/{id}/cancel' => [TotemAdminController::class, 'cancelReservationAdmin'],
+    'POST /admin/totem/reservations/{id}/delete' => [TotemAdminController::class, 'deleteReservationAdmin'],
     'GET  /admin/totem/audit'               => [TotemAdminController::class, 'auditLogs'],
 ];

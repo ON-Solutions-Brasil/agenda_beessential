@@ -820,17 +820,27 @@ class TotemAdminController extends Controller
             $sellerPhone = $seller->phone ?? null;
         }
 
+        // Vendedores disponíveis para a unidade da sala (para o dropdown de edição)
+        $room = $this->roomModel->find((int) $r->room_id);
+        $unitId = $room ? (int) $room->unit_id : null;
+        $sellers = array_map(
+            fn($s) => ['id' => (int) $s->id, 'name' => $s->name],
+            (new Seller())->getActive($unitId)
+        );
+
         $this->json([
             'success' => true,
             'reservation' => [
                 'id'             => (int) $r->id,
                 'room'           => $r->room_name,
                 'date'           => date('d/m/Y', strtotime($r->reservation_date)),
+                'date_iso'       => $r->reservation_date,
                 'start'          => substr($r->start_time, 0, 5),
                 'end'            => substr($r->end_time, 0, 5),
                 'customer_name'  => $r->customer_name,
                 'customer_phone' => $r->customer_phone,
                 'customer_email' => $r->customer_email,
+                'seller_id'      => $r->seller_id ? (int) $r->seller_id : null,
                 'seller_name'    => $r->seller_name,
                 'seller_phone'   => $sellerPhone,
                 'interest'       => $r->interest,
@@ -838,7 +848,209 @@ class TotemAdminController extends Controller
                 'source'         => $r->source,
                 'created_at'     => date('d/m/Y H:i', strtotime($r->created_at)),
             ],
+            'sellers' => $sellers,
         ]);
+    }
+
+    /**
+     * Atualiza uma reserva a partir do calendário (admin).
+     * Permite alterar data, horário, cliente, contato e vendedor.
+     */
+    public function updateReservationAdmin(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            $this->json(['success' => false, 'message' => 'Token de segurança inválido.'], 400);
+            return;
+        }
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $r = $reservationModel->find((int) $id);
+        if (!$r) {
+            $this->json(['success' => false, 'message' => 'Reserva não encontrada.'], 404);
+            return;
+        }
+
+        $name  = trim((string) $this->input('customer_name', ''));
+        $phone = trim((string) $this->input('customer_phone', ''));
+        $email = trim((string) $this->input('customer_email', ''));
+        $interest = trim((string) $this->input('interest', ''));
+        $date  = trim((string) $this->input('reservation_date', $r->reservation_date));
+        $start = trim((string) $this->input('start_time', substr($r->start_time, 0, 5)));
+        $end   = trim((string) $this->input('end_time', substr($r->end_time, 0, 5)));
+        $sellerId = (int) $this->input('seller_id', 0);
+
+        if ($name === '') {
+            $this->json(['success' => false, 'message' => 'O nome do cliente é obrigatório.'], 422);
+            return;
+        }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            $this->json(['success' => false, 'message' => 'Data inválida.'], 422);
+            return;
+        }
+        if ($start >= $end) {
+            $this->json(['success' => false, 'message' => 'O horário final deve ser maior que o inicial.'], 422);
+            return;
+        }
+
+        $startTime = $start . ':00';
+        $endTime   = $end . ':00';
+
+        // Conflito de horário na mesma sala (excluindo a própria reserva)
+        if ($reservationModel->hasConflict((int) $r->room_id, $date, $startTime, $endTime, (int) $r->id)) {
+            $this->json(['success' => false, 'message' => 'Conflito de horário nesta sala.'], 409);
+            return;
+        }
+
+        $seller = null;
+        if ($sellerId > 0) {
+            $seller = (new Seller())->find($sellerId);
+        }
+
+        // Estado anterior para auditoria
+        $before = [
+            'reservation_date' => (string) $r->reservation_date,
+            'start_time'       => substr($r->start_time, 0, 5),
+            'end_time'         => substr($r->end_time, 0, 5),
+            'customer_name'    => (string) ($r->customer_name ?? ''),
+            'customer_phone'   => (string) ($r->customer_phone ?? ''),
+            'customer_email'   => (string) ($r->customer_email ?? ''),
+            'seller_name'      => (string) ($r->seller_name ?? ''),
+            'interest'         => (string) ($r->interest ?? ''),
+        ];
+        $after = [
+            'reservation_date' => $date,
+            'start_time'       => $start,
+            'end_time'         => $end,
+            'customer_name'    => $name,
+            'customer_phone'   => $phone,
+            'customer_email'   => $email,
+            'seller_name'      => $seller ? (string) $seller->name : '',
+            'interest'         => $interest,
+        ];
+
+        $reservationModel->update((int) $r->id, [
+            'reservation_date' => $date,
+            'start_time'       => $startTime,
+            'end_time'         => $endTime,
+            'customer_name'    => $name,
+            'customer_phone'   => $phone !== '' ? $phone : null,
+            'customer_email'   => $email !== '' ? $email : null,
+            'seller_id'        => $seller ? (int) $seller->id : null,
+            'seller_name'      => $seller ? $seller->name : null,
+            'interest'         => $interest !== '' ? $interest : null,
+        ]);
+
+        (new \App\Models\ReservationAudit())->recordChanges(
+            (int) $r->id, $before, $after,
+            ['reservation_date', 'start_time', 'end_time', 'customer_name', 'customer_phone', 'customer_email', 'seller_name', 'interest'],
+            'Admin'
+        );
+        (new ActivityLog())->log('reservation.updated', 'room_reservation', (int) $r->id, 'Reserva editada pelo calendário');
+
+        // Notifica a atualização
+        try {
+            $updated = $reservationModel->find((int) $r->id);
+            (new \App\Services\NotificationService())->notifyReservation($this->reservationNotificationData($updated, 'updated'), 'updated');
+        } catch (\Throwable $e) {
+            error_log('[TotemAdmin] Falha ao notificar update: ' . $e->getMessage());
+        }
+
+        $this->json(['success' => true, 'message' => 'Reserva atualizada!']);
+    }
+
+    /**
+     * Cancela uma reserva (admin) — mantém no histórico.
+     */
+    public function cancelReservationAdmin(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            $this->json(['success' => false, 'message' => 'Token de segurança inválido.'], 400);
+            return;
+        }
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $r = $reservationModel->find((int) $id);
+        if (!$r) {
+            $this->json(['success' => false, 'message' => 'Reserva não encontrada.'], 404);
+            return;
+        }
+
+        $reservationModel->update((int) $r->id, ['status' => 'cancelled']);
+        (new \App\Models\ReservationAudit())->record((int) $r->id, 'cancelled', 'status', $r->status, 'cancelled', 'Admin');
+        (new ActivityLog())->log('reservation.cancelled', 'room_reservation', (int) $r->id, 'Reserva cancelada pelo calendário');
+
+        try {
+            (new \App\Services\NotificationService())->notifyReservation($this->reservationNotificationData($r, 'cancelled'), 'cancelled');
+        } catch (\Throwable $e) {
+            error_log('[TotemAdmin] Falha ao notificar cancelamento: ' . $e->getMessage());
+        }
+
+        $this->json(['success' => true, 'message' => 'Reserva cancelada.']);
+    }
+
+    /**
+     * Exclui permanentemente uma reserva (admin).
+     */
+    public function deleteReservationAdmin(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            $this->json(['success' => false, 'message' => 'Token de segurança inválido.'], 400);
+            return;
+        }
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $r = $reservationModel->find((int) $id);
+        if (!$r) {
+            $this->json(['success' => false, 'message' => 'Reserva não encontrada.'], 404);
+            return;
+        }
+
+        (new \App\Models\ReservationAudit())->record((int) $r->id, 'deleted', 'status', $r->status, 'deleted', 'Admin');
+        (new ActivityLog())->log('reservation.deleted', 'room_reservation', (int) $r->id, 'Reserva excluída pelo calendário');
+        $reservationModel->delete((int) $r->id);
+
+        $this->json(['success' => true, 'message' => 'Reserva excluída.']);
+    }
+
+    /**
+     * Monta os dados de notificação a partir de uma reserva.
+     */
+    private function reservationNotificationData(object $r, string $event): array
+    {
+        $room = $this->roomModel->find((int) $r->room_id);
+        $itemModel = new RoomItem();
+        $items = array_map(fn($it) => ['name' => $it->name, 'description' => $it->description],
+            $itemModel->getActiveByRoom((int) $r->room_id));
+
+        $sellerEmail = null; $sellerPhone = null;
+        if (!empty($r->seller_id)) {
+            $seller = (new Seller())->find((int) $r->seller_id);
+            if ($seller) { $sellerEmail = $seller->email ?? null; $sellerPhone = $seller->phone ?? null; }
+        }
+
+        return [
+            'reservation_id' => (int) $r->id,
+            'room'           => $room ? $room->name : '',
+            'date'           => date('d/m/Y', strtotime($r->reservation_date)),
+            'start'          => substr($r->start_time, 0, 5),
+            'end'            => substr($r->end_time, 0, 5),
+            'customer_name'  => $r->customer_name,
+            'customer_phone' => $r->customer_phone,
+            'customer_email' => $r->customer_email,
+            'seller_id'      => $r->seller_id ? (int) $r->seller_id : null,
+            'seller_name'    => $r->seller_name,
+            'seller_email'   => $sellerEmail,
+            'seller_phone'   => $sellerPhone,
+            'interest'       => $r->interest ?? null,
+            'status'         => $event === 'cancelled' ? 'cancelled' : ($r->status ?? 'reserved'),
+            'items'          => $items,
+        ];
     }
 
     /**

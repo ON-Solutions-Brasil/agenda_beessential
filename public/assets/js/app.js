@@ -80,36 +80,108 @@ function initCalendar() {
     });
 
     calendar.render();
+    window._kiroCalendar = calendar;
+    initCalReservationActions();
 }
 
 /**
- * Abre o modal com os detalhes de uma reserva de sala (evento do totem).
+ * Abre o modal editável com os detalhes de uma reserva de sala (evento do totem).
+ * O id do evento vem como "r<ID>".
  */
 function showCalReservation(event, props) {
     const modalEl = document.getElementById('calResModal');
     if (!modalEl) return;
 
-    const start = event.start ? formatTime(event.start) : '';
-    const end = event.end ? formatTime(event.end) : '';
-    const dateStr = event.start ? event.start.toLocaleDateString('pt-BR') : '';
+    const resId = String(event.id).replace(/^r/, '');
+    const errEl = document.getElementById('calResError');
+    errEl.textContent = '';
 
-    const row = (label, val) => val
-        ? '<tr><td class="text-muted" style="width:150px">' + label + '</td><td><strong>' + escapeHtmlCal(val) + '</strong></td></tr>'
-        : '';
+    fetch('/admin/totem/reservations/' + resId)
+        .then(r => r.json())
+        .then(data => {
+            if (!data.success) { errEl.textContent = data.message || 'Erro'; return; }
+            const r = data.reservation;
+            document.getElementById('calResId').value = r.id;
+            document.getElementById('calResRoom').textContent = r.room || props.sala || '';
+            document.getElementById('calResDate').value = r.date_iso || '';
+            document.getElementById('calResStart').value = r.start || '';
+            document.getElementById('calResEnd').value = r.end || '';
+            document.getElementById('calResName').value = r.customer_name || '';
+            document.getElementById('calResPhone').value = r.customer_phone || '';
+            document.getElementById('calResEmail').value = r.customer_email || '';
+            document.getElementById('calResInterest').value = r.interest || '';
 
-    document.getElementById('calResBody').innerHTML =
-        '<table class="table table-sm">' +
-        row('Sala', props.sala) +
-        row('Data', dateStr) +
-        row('Horário', start + ' – ' + end) +
-        row('Visitante', props.visitante) +
-        row('Telefone', props.telefone) +
-        row('E-mail', props.email) +
-        row('Vendedor', props.vendedor) +
-        row('Interesse', props.interesse) +
-        '</table>';
+            // Popula vendedores da unidade
+            const sel = document.getElementById('calResSeller');
+            sel.innerHTML = '<option value="">—</option>' +
+                (data.sellers || []).map(s =>
+                    '<option value="' + s.id + '"' + (r.seller_id === s.id ? ' selected' : '') + '>' +
+                    escapeHtmlCal(s.name) + '</option>'
+                ).join('');
+        })
+        .catch(() => { errEl.textContent = 'Erro ao carregar a reserva.'; });
 
     new bootstrap.Modal(modalEl).show();
+}
+
+function calGetCsrf() {
+    const el = document.querySelector('#calResModal input[name="_csrf_token"]');
+    return el ? el.value : '';
+}
+
+function calReloadCalendar() {
+    if (window._kiroCalendar) window._kiroCalendar.refetchEvents();
+}
+
+function initCalReservationActions() {
+    const modalEl = document.getElementById('calResModal');
+    if (!modalEl) return;
+    const errEl = document.getElementById('calResError');
+    const idOf = () => document.getElementById('calResId').value;
+    const hide = () => bootstrap.Modal.getInstance(modalEl).hide();
+
+    document.getElementById('calResSave').addEventListener('click', function () {
+        const body = new URLSearchParams();
+        body.append('_csrf_token', calGetCsrf());
+        body.append('reservation_date', document.getElementById('calResDate').value);
+        body.append('start_time', document.getElementById('calResStart').value);
+        body.append('end_time', document.getElementById('calResEnd').value);
+        body.append('customer_name', document.getElementById('calResName').value.trim());
+        body.append('customer_phone', document.getElementById('calResPhone').value.trim());
+        body.append('customer_email', document.getElementById('calResEmail').value.trim());
+        body.append('seller_id', document.getElementById('calResSeller').value);
+        body.append('interest', document.getElementById('calResInterest').value.trim());
+
+        this.disabled = true;
+        fetch('/admin/totem/reservations/' + idOf() + '/update', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { hide(); calReloadCalendar(); }
+                else { errEl.textContent = data.message || 'Erro ao salvar.'; }
+            })
+            .catch(() => { errEl.textContent = 'Erro de conexão.'; })
+            .finally(() => { this.disabled = false; });
+    });
+
+    document.getElementById('calResCancel').addEventListener('click', function () {
+        if (!confirm('Cancelar esta reserva? O horário será liberado.')) return;
+        const body = new URLSearchParams();
+        body.append('_csrf_token', calGetCsrf());
+        fetch('/admin/totem/reservations/' + idOf() + '/cancel', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => { if (data.success) { hide(); calReloadCalendar(); } else { errEl.textContent = data.message; } })
+            .catch(() => { errEl.textContent = 'Erro de conexão.'; });
+    });
+
+    document.getElementById('calResDelete').addEventListener('click', function () {
+        if (!confirm('Excluir permanentemente esta reserva? Esta ação não pode ser desfeita.')) return;
+        const body = new URLSearchParams();
+        body.append('_csrf_token', calGetCsrf());
+        fetch('/admin/totem/reservations/' + idOf() + '/delete', { method: 'POST', body: body })
+            .then(r => r.json())
+            .then(data => { if (data.success) { hide(); calReloadCalendar(); } else { errEl.textContent = data.message; } })
+            .catch(() => { errEl.textContent = 'Erro de conexão.'; });
+    });
 }
 
 function formatTime(d) {
