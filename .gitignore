@@ -1,0 +1,26 @@
+# Dependências
+/vendor/
+/node_modules/
+
+# Storage
+/storage/logs/*.log
+/storage/cache/*
+
+# Uploads do usuário
+/public/uploads/*
+!/public/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configuração local
+config/local.php

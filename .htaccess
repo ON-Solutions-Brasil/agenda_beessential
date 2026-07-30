@@ -1,0 +1,35 @@
+DirectoryIndex index.php
+
+# Limites de upload (funciona com mod_php; ignorado com PHP-FPM)
+<IfModule mod_php.c>
+  php_value upload_max_filesize 64M
+  php_value post_max_size 64M
+  php_value max_execution_time 300
+  php_value max_input_time 300
+</IfModule>
+
+# CSP com Stripe e CDN permitidos (unset primeiro para evitar duplicatas do PHP)
+<IfModule mod_headers.c>
+  Header always unset Content-Security-Policy
+  Header always set Content-Security-Policy "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; form-action 'self' https://checkout.stripe.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; script-src 'self' 'unsafe-inline' https://js.stripe.com https://cdn.jsdelivr.net blob:; connect-src 'self' https://api.stripe.com ws: wss:; frame-src https://js.stripe.com https://hooks.stripe.com;"
+</IfModule>
+
+RewriteEngine On
+
+# Entrada da aplicação na raiz
+RewriteRule ^$ index.php [L]
+RewriteRule ^index\.html$ index.php [L]
+
+# Servir assets diretamente do /public
+RewriteRule ^assets/(.*)$ public/assets/$1 [L]
+RewriteRule ^uploads/(.*)$ public/uploads/$1 [L]
+RewriteRule ^import\.png$ public/import.png [L]
+RewriteRule ^favicon\.ico$ public/favicon.ico [L]
+
+# Se o arquivo ou diretório existir na raiz, entrega direto
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Caso contrário, envia tudo para o front controller em /public
+RewriteRule ^ public/index.php [L]

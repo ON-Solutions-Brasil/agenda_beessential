@@ -1,0 +1,100 @@
+<?php
+
+namespace App\Core;
+
+/**
+ * Controller base.
+ * Todos os controllers da aplicação devem estender esta classe.
+ */
+abstract class Controller
+{
+    /**
+     * Renderiza uma view com dados.
+     */
+    protected function view(string $view, array $data = []): void
+    {
+        View::render($view, $data);
+    }
+
+    /**
+     * Redireciona para outra URL.
+     */
+    protected function redirect(string $url): void
+    {
+        header("Location: {$url}");
+        exit;
+    }
+
+    /**
+     * Retorna resposta JSON.
+     */
+    protected function json(mixed $data, int $status = 200): void
+    {
+        http_response_code($status);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($data, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
+     * Obtém dados do POST.
+     */
+    protected function input(string $key, $default = null): mixed
+    {
+        return $_POST[$key] ?? $default;
+    }
+
+    /**
+     * Obtém dados do GET (query string).
+     */
+    protected function query(string $key, $default = null): mixed
+    {
+        return $_GET[$key] ?? $default;
+    }
+
+    /**
+     * Valida token CSRF.
+     */
+    protected function validateCsrf(): bool
+    {
+        $token = $this->input('_csrf_token');
+        return Session::validateCsrfToken($token);
+    }
+
+    /**
+     * Exige que o usuário esteja autenticado.
+     */
+    protected function requireAuth(): void
+    {
+        if (!Auth::check()) {
+            Session::flash('error', 'Você precisa estar logado para acessar esta página.');
+            $this->redirect('/login');
+        }
+    }
+
+    /**
+     * Exige que o usuário tenha determinada permissão.
+     */
+    protected function requirePermission(string $permission): void
+    {
+        $this->requireAuth();
+        if (!Auth::hasPermission($permission)) {
+            http_response_code(403);
+            $this->view('errors/403');
+            exit;
+        }
+    }
+
+    /**
+     * Exige que o usuário seja superadmin.
+     */
+    protected function requireSuperAdmin(): void
+    {
+        $this->requireAuth();
+        if (!Auth::isSuperAdmin()) {
+            http_response_code(403);
+            $this->view('errors/403');
+            exit;
+        }
+    }
+}
