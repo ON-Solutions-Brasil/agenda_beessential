@@ -322,16 +322,31 @@ class NotificationService
             throw new \RuntimeException('Servidor recusou DATA');
         }
 
+        $messageId = '<' . bin2hex(random_bytes(12)) . '@' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . '>';
         $headers  = 'From: ' . $this->encodeHeader($fromName) . " <{$fromEmail}>\r\n";
         $headers .= 'To: ' . $this->encodeHeader($toName) . " <{$toEmail}>\r\n";
         $headers .= 'Subject: ' . $this->encodeHeader($subject) . "\r\n";
+        $headers .= 'Date: ' . date('r') . "\r\n";
+        $headers .= 'Message-ID: ' . $messageId . "\r\n";
         $headers .= "MIME-Version: 1.0\r\n";
         $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-        $headers .= "Content-Transfer-Encoding: 8bit\r\n";
+        // Base64 (quebrado em linhas de 76 chars) evita problemas com o limite
+        // de ~1000 caracteres por linha do SMTP, que descartava e-mails com HTML longo.
+        $headers .= "Content-Transfer-Encoding: base64\r\n";
 
-        // Escapa pontos no início de linha (transparência SMTP)
-        $body = preg_replace('/^\./m', '..', $htmlBody);
-        $cmd($headers . "\r\n" . $body . "\r\n.");
+        $body = rtrim(chunk_split(base64_encode($htmlBody), 76, "\r\n"));
+
+        // Normaliza quebras de linha para CRLF e faz dot-stuffing
+        $message = $headers . "\r\n" . $body;
+        $message = preg_replace('/\r\n|\r|\n/', "\r\n", $message);
+        $message = preg_replace('/^\./m', '..', $message);
+
+        $dataSendResp = $cmd($message . "\r\n.");
+        if (strpos($dataSendResp, '250') === false) {
+            fclose($fp);
+            throw new \RuntimeException('Servidor não confirmou o recebimento da mensagem: ' . trim($dataSendResp));
+        }
+
         $cmd('QUIT');
         fclose($fp);
 
