@@ -350,22 +350,35 @@ class NotificationService
             throw new \RuntimeException('Servidor recusou DATA: ' . trim($dataResp));
         }
 
-        $messageId = '<' . bin2hex(random_bytes(12)) . '@' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . '>';
+        $domain = substr(strrchr($fromEmail, '@'), 1) ?: ($_SERVER['SERVER_NAME'] ?? 'localhost');
+        $messageId = '<' . bin2hex(random_bytes(12)) . '@' . $domain . '>';
+        $boundary  = 'bnd_' . bin2hex(random_bytes(12));
+
+        // Versão texto puro a partir do HTML (melhora entregabilidade e reduz spam)
+        $textBody = $this->htmlToText($htmlBody);
+
         $headers  = 'From: ' . $this->encodeHeader($fromName) . " <{$fromEmail}>\r\n";
         $headers .= 'To: ' . $this->encodeHeader($toName) . " <{$toEmail}>\r\n";
+        $headers .= 'Reply-To: ' . $this->encodeHeader($fromName) . " <{$fromEmail}>\r\n";
         $headers .= 'Subject: ' . $this->encodeHeader($subject) . "\r\n";
         $headers .= 'Date: ' . date('r') . "\r\n";
         $headers .= 'Message-ID: ' . $messageId . "\r\n";
         $headers .= "MIME-Version: 1.0\r\n";
-        $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
-        // Base64 (quebrado em linhas de 76 chars) evita problemas com o limite
-        // de ~1000 caracteres por linha do SMTP, que descartava e-mails com HTML longo.
-        $headers .= "Content-Transfer-Encoding: base64\r\n";
+        $headers .= "Content-Type: multipart/alternative; boundary=\"{$boundary}\"\r\n";
 
-        $body = rtrim(chunk_split(base64_encode($htmlBody), 76, "\r\n"));
+        // Corpo multipart: texto primeiro, HTML depois (ordem exigida pelo padrão)
+        $parts  = "--{$boundary}\r\n";
+        $parts .= "Content-Type: text/plain; charset=UTF-8\r\n";
+        $parts .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $parts .= rtrim(chunk_split(base64_encode($textBody), 76, "\r\n")) . "\r\n";
+        $parts .= "--{$boundary}\r\n";
+        $parts .= "Content-Type: text/html; charset=UTF-8\r\n";
+        $parts .= "Content-Transfer-Encoding: base64\r\n\r\n";
+        $parts .= rtrim(chunk_split(base64_encode($htmlBody), 76, "\r\n")) . "\r\n";
+        $parts .= "--{$boundary}--";
 
         // Normaliza quebras de linha para CRLF e faz dot-stuffing
-        $message = $headers . "\r\n" . $body;
+        $message = $headers . "\r\n" . $parts;
         $message = preg_replace('/\r\n|\r|\n/', "\r\n", $message);
         $message = preg_replace('/^\./m', '..', $message);
 
@@ -384,6 +397,21 @@ class NotificationService
     private function encodeHeader(string $value): string
     {
         return '=?UTF-8?B?' . base64_encode($value) . '?=';
+    }
+
+    /**
+     * Converte o corpo HTML em texto simples legível para a parte text/plain.
+     */
+    private function htmlToText(string $html): string
+    {
+        $text = preg_replace('/<(script|style)\b[^>]*>.*?<\/\1>/is', '', $html);
+        $text = preg_replace('/<\/(p|div|tr|h[1-6]|li)>/i', "\n", $text);
+        $text = preg_replace('/<br\s*\/?>/i', "\n", $text);
+        $text = strip_tags($text);
+        $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
+        $text = preg_replace('/[ \t]+/', ' ', $text);
+        $text = preg_replace('/\n\s*\n\s*\n+/', "\n\n", $text);
+        return trim($text);
     }
 
     /**
