@@ -2,6 +2,9 @@
 use App\Core\Auth;
 use App\Core\Session;
 use App\Core\View;
+use App\Models\Setting;
+
+$navLogo = (new Setting())->getValue('totem_logo', '');
 ?>
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -18,8 +21,12 @@ use App\Core\View;
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="/dashboard">
+            <a class="navbar-brand fw-bold d-flex align-items-center" href="/dashboard">
+                <?php if (!empty($navLogo)): ?>
+                <img src="<?= View::escape($navLogo) ?>" alt="Logo" class="navbar-logo">
+                <?php else: ?>
                 <i class="bi bi-calendar-check me-2"></i>Agenda Beessential
+                <?php endif; ?>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
                 <span class="navbar-toggler-icon"></span>
