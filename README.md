@@ -62,10 +62,8 @@ agenda_beessential/
 
 ## Acesso Inicial
 
-Após executar as migrations, o sistema cria um superadmin padrão:
+Após executar as migrations, o sistema cria um superadmin padrão.
 
-- **Email**: admin@beessential.com.br
-- **Senha**: admin123
 
 > ⚠️ Altere a senha padrão imediatamente após o primeiro acesso.
 
