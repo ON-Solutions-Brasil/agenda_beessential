@@ -14,6 +14,7 @@ class NotificationService
 {
     private Setting $settings;
     private NotificationLog $logs;
+    private array $transcript = [];
 
     public function __construct()
     {
@@ -85,15 +86,25 @@ class NotificationService
             return false;
         }
 
+        $this->transcript = [];
         try {
             $this->smtpSend($host, $port, $enc, $user, $pass, $fromEmail, $fromName, $toEmail, $toName, $subject, $htmlBody);
-            $this->logs->record('email', 'success', $toEmail, $subject, null, $reservationId);
+            $this->logs->record('email', 'success', $toEmail, $subject, $this->transcriptText(), $reservationId);
             return true;
         } catch (\Throwable $e) {
             error_log('[NotificationService] Falha SMTP: ' . $e->getMessage());
-            $this->logs->record('email', 'failed', $toEmail, $subject, $e->getMessage(), $reservationId);
+            $detail = $e->getMessage() . "\n---\n" . $this->transcriptText();
+            $this->logs->record('email', 'failed', $toEmail, $subject, $detail, $reservationId);
             return false;
         }
+    }
+
+    /**
+     * Transcrição resumida da última conversa SMTP (para diagnóstico no log).
+     */
+    private function transcriptText(): string
+    {
+        return trim(implode("\n", $this->transcript));
     }
 
     /**
@@ -265,9 +276,16 @@ class NotificationService
                     break;
                 }
             }
+            $this->transcript[] = 'S: ' . trim($data);
             return $data;
         };
         $cmd = function (string $c) use ($fp, $read) {
+            // Não registra credenciais/corpo por completo na transcrição
+            $safe = $c;
+            if (strlen($safe) > 60) {
+                $safe = substr($safe, 0, 57) . '...';
+            }
+            $this->transcript[] = 'C: ' . $safe;
             fwrite($fp, $c . "\r\n");
             return $read();
         };
@@ -314,12 +332,22 @@ class NotificationService
             }
         }
 
-        $cmd("MAIL FROM:<{$fromEmail}>");
-        $cmd("RCPT TO:<{$toEmail}>");
+        $mailResp = $cmd("MAIL FROM:<{$fromEmail}>");
+        if (strpos($mailResp, '250') === false) {
+            fclose($fp);
+            throw new \RuntimeException('Remetente recusado (MAIL FROM): ' . trim($mailResp));
+        }
+
+        $rcptResp = $cmd("RCPT TO:<{$toEmail}>");
+        if (strpos($rcptResp, '250') === false && strpos($rcptResp, '251') === false) {
+            fclose($fp);
+            throw new \RuntimeException('Destinatário recusado (RCPT TO): ' . trim($rcptResp));
+        }
+
         $dataResp = $cmd('DATA');
         if (strpos($dataResp, '354') === false) {
             fclose($fp);
-            throw new \RuntimeException('Servidor recusou DATA');
+            throw new \RuntimeException('Servidor recusou DATA: ' . trim($dataResp));
         }
 
         $messageId = '<' . bin2hex(random_bytes(12)) . '@' . ($_SERVER['SERVER_NAME'] ?? 'localhost') . '>';
