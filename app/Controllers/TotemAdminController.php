@@ -680,6 +680,7 @@ class TotemAdminController extends Controller
 
         $sellerModel = new Seller();
         $id = $sellerModel->create([
+            'unit_id'    => max(1, (int) $this->input('unit_id', 1)),
             'name'       => $name,
             'email'      => trim((string) $this->input('email', '')) ?: null,
             'phone'      => trim((string) $this->input('phone', '')) ?: null,
@@ -723,6 +724,7 @@ class TotemAdminController extends Controller
         }
 
         $sellerModel->update((int) $id, [
+            'unit_id'    => max(1, (int) $this->input('unit_id', (int) $seller->unit_id)),
             'name'       => $name,
             'email'      => trim((string) $this->input('email', '')) ?: null,
             'phone'      => trim((string) $this->input('phone', '')) ?: null,

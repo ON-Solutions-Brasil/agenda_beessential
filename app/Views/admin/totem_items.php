@@ -101,9 +101,9 @@
                                    placeholder="Ex: Demonstração de imagem em alta resolução">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Ícone (Bootstrap Icons)</label>
-                            <input type="text" class="form-control" name="icon" id="itemIcon"
-                                   value="bi-check2-circle" placeholder="bi-check2-circle">
+                            <label class="form-label">Ícone</label>
+                            <input type="text" class="icon-picker-input" name="icon" id="itemIcon"
+                                   value="bi-check2-circle">
                         </div>
                         <div class="col-md-3">
                             <label class="form-label">Ordem</label>
@@ -133,7 +133,7 @@ function prepareItemModal() {
     document.getElementById('itemForm').action = '/admin/totem/items/store';
     document.getElementById('itemName').value = '';
     document.getElementById('itemDescription').value = '';
-    document.getElementById('itemIcon').value = 'bi-check2-circle';
+    setIconPickerValue('itemIcon', 'bi-check2-circle');
     document.getElementById('itemSortOrder').value = '0';
     document.getElementById('itemActive').value = '1';
 }
@@ -143,7 +143,7 @@ function editItem(item) {
     document.getElementById('itemForm').action = '/admin/totem/items/' + item.id + '/update';
     document.getElementById('itemName').value = item.name || '';
     document.getElementById('itemDescription').value = item.description || '';
-    document.getElementById('itemIcon').value = item.icon || 'bi-check2-circle';
+    setIconPickerValue('itemIcon', item.icon || 'bi-check2-circle');
     document.getElementById('itemSortOrder').value = item.sort_order || 0;
     document.getElementById('itemActive').value = String(item.active);
     new bootstrap.Modal(document.getElementById('itemModal')).show();

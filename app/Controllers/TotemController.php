@@ -140,7 +140,7 @@ class TotemController extends Controller
 
         View::render('totem/index', [
             'config'  => $this->totemConfig($unit),
-            'sellers' => $sellerModel->getActive(),
+            'sellers' => $sellerModel->getActive((int) $unit->id),
             'logo'    => (string) $this->settingModel->getValue('totem_logo', ''),
             'unit'    => $unit,
         ], 'totem');
@@ -306,13 +306,13 @@ class TotemController extends Controller
             }
         }
 
-        // Vendedor selecionado (opcional, mas com dropdown de cadastros)
+        // Vendedor selecionado (opcional, mas deve pertencer à unidade do totem)
         $seller = null;
         if ($sellerId > 0) {
             $sellerModel = new Seller();
             $seller = $sellerModel->find($sellerId);
-            if (!$seller || (int) $seller->active !== 1) {
-                $this->json(['success' => false, 'message' => 'Vendedor inválido.'], 422);
+            if (!$seller || (int) $seller->active !== 1 || (int) $seller->unit_id !== (int) $unit->id) {
+                $this->json(['success' => false, 'message' => 'Vendedor inválido para esta unidade.'], 422);
                 return;
             }
         }

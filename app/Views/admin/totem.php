@@ -202,17 +202,18 @@
             <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
-                        <th>Ordem</th><th>Nome</th><th>E-mail</th><th>Telefone</th><th>Ativo</th>
+                        <th>Ordem</th><th>Nome</th><th>Unidade</th><th>E-mail</th><th>Telefone</th><th>Ativo</th>
                         <th class="text-end">Ações</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($sellers)): ?>
-                    <tr><td colspan="6" class="text-center text-muted py-4">Nenhum vendedor cadastrado.</td></tr>
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhum vendedor cadastrado.</td></tr>
                     <?php else: foreach ($sellers as $seller): ?>
                     <tr>
                         <td><?= (int)$seller->sort_order ?></td>
                         <td><strong><?= View::escape($seller->name) ?></strong></td>
+                        <td class="small"><span class="badge bg-light text-dark"><?= View::escape($seller->unit_name ?? '-') ?></span></td>
                         <td class="small text-muted"><?= View::escape($seller->email ?? '-') ?></td>
                         <td class="small text-muted"><?= View::escape($seller->phone ?? '-') ?></td>
                         <td>
@@ -226,6 +227,7 @@
                             <button class="btn btn-sm btn-outline-primary"
                                     onclick='editSeller(<?= json_encode([
                                         "id" => (int)$seller->id,
+                                        "unit_id" => (int)$seller->unit_id,
                                         "name" => $seller->name,
                                         "email" => $seller->email,
                                         "phone" => $seller->phone,
@@ -464,9 +466,8 @@
                             </div>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Ícone (fallback, Bootstrap Icons)</label>
-                            <input type="text" class="form-control" name="icon" id="roomIcon" value="bi-easel"
-                                   placeholder="bi-easel">
+                            <label class="form-label">Ícone (usado quando não há imagem)</label>
+                            <input type="text" class="icon-picker-input" name="icon" id="roomIcon" value="bi-easel">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label">Capacidade</label>
@@ -513,6 +514,14 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Unidade <span class="text-danger">*</span></label>
+                            <select class="form-select" name="unit_id" id="sellerUnit" required>
+                                <?php foreach ($units as $u): ?>
+                                <option value="<?= (int)$u->id ?>"><?= View::escape($u->name) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Nome <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="name" id="sellerName" required>
@@ -635,7 +644,7 @@ function prepareRoomModal() {
     document.getElementById('roomForm').action = '/admin/totem/rooms/store';
     document.getElementById('roomName').value = '';
     document.getElementById('roomDescription').value = '';
-    document.getElementById('roomIcon').value = 'bi-easel';
+    setIconPickerValue('roomIcon', 'bi-easel');
     document.getElementById('roomCapacity').value = '';
     document.getElementById('roomSortOrder').value = '0';
     document.getElementById('roomActive').value = '1';
@@ -651,7 +660,7 @@ function editRoom(room) {
     if (room.unit_id) document.getElementById('roomUnit').value = String(room.unit_id);
     document.getElementById('roomName').value = room.name || '';
     document.getElementById('roomDescription').value = room.description || '';
-    document.getElementById('roomIcon').value = room.icon || 'bi-easel';
+    setIconPickerValue('roomIcon', room.icon || 'bi-easel');
     document.getElementById('roomCapacity').value = room.capacity || '';
     document.getElementById('roomSortOrder').value = room.sort_order || 0;
     document.getElementById('roomActive').value = String(room.active);
@@ -675,6 +684,7 @@ function prepareSellerModal() {
 function editSeller(seller) {
     document.getElementById('sellerModalTitle').textContent = 'Editar Vendedor';
     document.getElementById('sellerForm').action = '/admin/totem/sellers/' + seller.id + '/update';
+    if (seller.unit_id) document.getElementById('sellerUnit').value = String(seller.unit_id);
     document.getElementById('sellerName').value = seller.name || '';
     document.getElementById('sellerEmail').value = seller.email || '';
     document.getElementById('sellerPhone').value = seller.phone || '';
