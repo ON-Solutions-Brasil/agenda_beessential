@@ -8,6 +8,7 @@ use App\Models\Setting;
 use App\Models\Room;
 use App\Models\RoomItem;
 use App\Models\Seller;
+use App\Models\Unit;
 use App\Models\NotificationLog;
 use App\Models\ActivityLog;
 
@@ -49,12 +50,208 @@ class TotemAdminController extends Controller
         }
 
         $sellerModel = new Seller();
+        $unitModel = new Unit();
 
         $this->view('admin/totem', [
             'config'  => $config,
-            'rooms'   => $this->roomModel->allOrdered(),
+            'rooms'   => $this->roomModel->allWithUnit(),
             'sellers' => $sellerModel->allOrdered(),
+            'units'   => $unitModel->allOrdered(),
         ]);
+    }
+
+    /**
+     * Cria uma unidade.
+     */
+    public function storeUnit(): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $name = trim((string) $this->input('name', ''));
+        $pin  = trim((string) $this->input('pin', ''));
+
+        if ($name === '') {
+            Session::flash('error', 'O nome da unidade é obrigatório.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+        if (!preg_match('/^\d{4}$/', $pin)) {
+            Session::flash('error', 'O PIN da unidade deve ter exatamente 4 dígitos.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $unitModel = new Unit();
+        if ($unitModel->pinExists($pin)) {
+            Session::flash('error', 'Este PIN já está em uso por outra unidade.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $id = $unitModel->create([
+            'name'       => $name,
+            'location'   => trim((string) $this->input('location', '')) ?: null,
+            'pin'        => $pin,
+            'open_time'  => $this->input('open_time', '08:00') . ':00',
+            'close_time' => $this->input('close_time', '18:00') . ':00',
+            'active'     => $this->input('active', '0') === '1' ? 1 : 0,
+            'sort_order' => (int) $this->input('sort_order', 0),
+        ]);
+
+        (new ActivityLog())->log('unit.created', 'unit', $id, "Unidade '{$name}' criada");
+        Session::flash('success', 'Unidade criada com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Atualiza uma unidade.
+     */
+    public function updateUnit(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $unitModel = new Unit();
+        $unit = $unitModel->find((int) $id);
+        if (!$unit) {
+            Session::flash('error', 'Unidade não encontrada.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $name = trim((string) $this->input('name', ''));
+        $pin  = trim((string) $this->input('pin', ''));
+
+        if ($name === '') {
+            Session::flash('error', 'O nome da unidade é obrigatório.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+        if (!preg_match('/^\d{4}$/', $pin)) {
+            Session::flash('error', 'O PIN da unidade deve ter exatamente 4 dígitos.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+        if ($unitModel->pinExists($pin, (int) $id)) {
+            Session::flash('error', 'Este PIN já está em uso por outra unidade.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $unitModel->update((int) $id, [
+            'name'       => $name,
+            'location'   => trim((string) $this->input('location', '')) ?: null,
+            'pin'        => $pin,
+            'open_time'  => $this->input('open_time', '08:00') . ':00',
+            'close_time' => $this->input('close_time', '18:00') . ':00',
+            'active'     => $this->input('active', '0') === '1' ? 1 : 0,
+            'sort_order' => (int) $this->input('sort_order', 0),
+        ]);
+
+        (new ActivityLog())->log('unit.updated', 'unit', (int) $id, "Unidade '{$name}' atualizada");
+        Session::flash('success', 'Unidade atualizada com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Exclui uma unidade (e suas salas, via cascade).
+     */
+    public function deleteUnit(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $unitModel = new Unit();
+        $unit = $unitModel->find((int) $id);
+        if (!$unit) {
+            Session::flash('error', 'Unidade não encontrada.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        if ($unitModel->count() <= 1) {
+            Session::flash('error', 'Não é possível excluir a única unidade existente.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $unitModel->delete((int) $id);
+        (new ActivityLog())->log('unit.deleted', 'unit', (int) $id, "Unidade '{$unit->name}' excluída");
+        Session::flash('success', 'Unidade excluída com sucesso!');
+        $this->redirect('/admin/totem');
+    }
+
+    /**
+     * Duplica as salas de uma unidade para outra (usa salas existentes como padrão).
+     */
+    public function cloneRooms(): void
+    {
+        $this->requireSuperAdmin();
+
+        if (!$this->validateCsrf()) {
+            Session::flash('error', 'Token de segurança inválido.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $fromUnit = (int) $this->input('from_unit', 0);
+        $toUnit   = (int) $this->input('to_unit', 0);
+
+        if ($fromUnit <= 0 || $toUnit <= 0 || $fromUnit === $toUnit) {
+            Session::flash('error', 'Selecione unidades de origem e destino diferentes.');
+            $this->redirect('/admin/totem');
+            return;
+        }
+
+        $rooms = $this->roomModel->allOrdered($fromUnit);
+        $itemModel = new RoomItem();
+        $count = 0;
+
+        foreach ($rooms as $room) {
+            $newId = $this->roomModel->create([
+                'unit_id'       => $toUnit,
+                'name'          => $room->name,
+                'description'   => $room->description,
+                'icon'          => $room->icon,
+                'image_path'    => $room->image_path ?? null,
+                'capacity'      => $room->capacity,
+                'active'        => (int) $room->active,
+                'show_in_totem' => (int) $room->show_in_totem,
+                'sort_order'    => (int) $room->sort_order,
+            ]);
+            // Clona os itens da sala
+            foreach ($itemModel->getByRoom((int) $room->id) as $it) {
+                $itemModel->create([
+                    'room_id'     => $newId,
+                    'name'        => $it->name,
+                    'description' => $it->description,
+                    'icon'        => $it->icon,
+                    'active'      => (int) $it->active,
+                    'sort_order'  => (int) $it->sort_order,
+                ]);
+            }
+            $count++;
+        }
+
+        (new ActivityLog())->log('unit.clone_rooms', 'unit', $toUnit, "Clonadas {$count} salas para a unidade #{$toUnit}");
+        Session::flash('success', "{$count} sala(s) copiada(s) com sucesso!");
+        $this->redirect('/admin/totem');
     }
 
     /**
@@ -213,6 +410,7 @@ class TotemAdminController extends Controller
         }
 
         $data = [
+            'unit_id'       => max(1, (int) $this->input('unit_id', 1)),
             'name'          => $name,
             'description'   => trim((string) $this->input('description', '')) ?: null,
             'icon'          => trim((string) $this->input('icon', 'bi-easel')) ?: 'bi-easel',
@@ -264,6 +462,7 @@ class TotemAdminController extends Controller
         }
 
         $data = [
+            'unit_id'       => max(1, (int) $this->input('unit_id', (int) $room->unit_id)),
             'name'          => $name,
             'description'   => trim((string) $this->input('description', '')) ?: null,
             'icon'          => trim((string) $this->input('icon', 'bi-easel')) ?: 'bi-easel',
@@ -578,6 +777,79 @@ class TotemAdminController extends Controller
         $logModel = new NotificationLog();
         $this->view('admin/totem_logs', [
             'logs' => $logModel->getRecent(200),
+        ]);
+    }
+
+    /**
+     * Lista de reservas (agendamentos) para administração.
+     */
+    public function reservations(): void
+    {
+        $this->requireSuperAdmin();
+
+        $unitId = (int) $this->query('unit', 0);
+        $selectedUnit = $unitId > 0 ? $unitId : null;
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $this->view('admin/totem_reservations', [
+            'reservations' => $reservationModel->getRecentWithRoom(300, $selectedUnit),
+            'units'        => (new Unit())->allOrdered(),
+            'selectedUnit' => $selectedUnit,
+        ]);
+    }
+
+    /**
+     * Detalhe de uma reserva em JSON (para o modal do admin/calendário).
+     */
+    public function reservationInfo(string $id): void
+    {
+        $this->requireSuperAdmin();
+
+        $reservationModel = new \App\Models\RoomReservation();
+        $r = $reservationModel->findWithRoom((int) $id);
+        if (!$r) {
+            $this->json(['success' => false, 'message' => 'Reserva não encontrada.'], 404);
+            return;
+        }
+
+        $sellerPhone = null;
+        if (!empty($r->seller_id)) {
+            $seller = (new Seller())->find((int) $r->seller_id);
+            $sellerPhone = $seller->phone ?? null;
+        }
+
+        $this->json([
+            'success' => true,
+            'reservation' => [
+                'id'             => (int) $r->id,
+                'room'           => $r->room_name,
+                'date'           => date('d/m/Y', strtotime($r->reservation_date)),
+                'start'          => substr($r->start_time, 0, 5),
+                'end'            => substr($r->end_time, 0, 5),
+                'customer_name'  => $r->customer_name,
+                'customer_phone' => $r->customer_phone,
+                'customer_email' => $r->customer_email,
+                'seller_name'    => $r->seller_name,
+                'seller_phone'   => $sellerPhone,
+                'interest'       => $r->interest,
+                'status'         => $r->status,
+                'source'         => $r->source,
+                'created_at'     => date('d/m/Y H:i', strtotime($r->created_at)),
+            ],
+        ]);
+    }
+
+    /**
+     * Aba "Logs de Ações" — auditoria de alterações nas reservas.
+     */
+    public function auditLogs(): void
+    {
+        $this->requireSuperAdmin();
+
+        $auditModel = new \App\Models\ReservationAudit();
+        $this->view('admin/totem_audit', [
+            'entries' => $auditModel->getRecent(300),
+            'labels'  => \App\Models\ReservationAudit::FIELD_LABELS,
         ]);
     }
 

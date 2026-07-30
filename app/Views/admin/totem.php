@@ -3,6 +3,12 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
     <h2><i class="bi bi-easel me-2"></i>Configuração do Modo Totem</h2>
     <div class="d-flex gap-2">
+        <a href="/admin/totem/reservations" class="btn btn-outline-secondary">
+            <i class="bi bi-calendar-check me-1"></i>Agendamentos
+        </a>
+        <a href="/admin/totem/audit" class="btn btn-outline-secondary">
+            <i class="bi bi-clock-history me-1"></i>Logs de Ações
+        </a>
         <a href="/admin/totem/logs" class="btn btn-outline-secondary">
             <i class="bi bi-envelope-paper me-1"></i>Logs de Envio
         </a>
@@ -39,9 +45,10 @@
                     <small class="text-muted">Substitui o ícone no topo do totem. Apenas PNG, até 4 MB.</small>
                 </div>
                 <div class="col-md-4">
-                    <label class="form-label">PIN de Acesso (4 dígitos)</label>
+                    <label class="form-label">PIN padrão (4 dígitos)</label>
                     <input type="text" class="form-control" name="totem_pin" maxlength="4" pattern="\d{4}"
                            inputmode="numeric" value="<?= View::escape((string)($config['totem_pin'] ?? '')) ?>" required>
+                    <small class="text-muted">O acesso ao totem usa o PIN de cada <strong>unidade</strong> (abaixo).</small>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Atualização Automática (segundos)</label>
@@ -50,12 +57,13 @@
                 </div>
 
                 <div class="col-md-3">
-                    <label class="form-label">Início do Funcionamento</label>
+                    <label class="form-label">Início (padrão)</label>
                     <input type="time" class="form-control" name="totem_open_time"
                            value="<?= View::escape((string)($config['totem_open_time'] ?? '08:00')) ?>">
+                    <small class="text-muted">Cada unidade tem seu horário.</small>
                 </div>
                 <div class="col-md-3">
-                    <label class="form-label">Fim do Funcionamento</label>
+                    <label class="form-label">Fim (padrão)</label>
                     <input type="time" class="form-control" name="totem_close_time"
                            value="<?= View::escape((string)($config['totem_close_time'] ?? '18:00')) ?>">
                 </div>
@@ -240,6 +248,97 @@
     </div>
 </div>
 
+<!-- Gestão de unidades -->
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong>Unidades (Totens)</strong>
+        <button class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#unitModal"
+                onclick="prepareUnitModal()">
+            <i class="bi bi-plus-lg me-1"></i>Nova Unidade
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Ordem</th><th>Nome</th><th>Localização</th><th>PIN</th>
+                        <th>Funcionamento</th><th>Ativa</th><th class="text-end">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (empty($units)): ?>
+                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma unidade cadastrada.</td></tr>
+                    <?php else: foreach ($units as $unit): ?>
+                    <tr>
+                        <td><?= (int)$unit->sort_order ?></td>
+                        <td><strong><?= View::escape($unit->name) ?></strong></td>
+                        <td class="small text-muted"><?= View::escape($unit->location ?? '-') ?></td>
+                        <td><span class="badge" style="background:#111;color:#FFC107;letter-spacing:2px"><?= View::escape($unit->pin) ?></span></td>
+                        <td class="small"><?= substr($unit->open_time,0,5) ?> – <?= substr($unit->close_time,0,5) ?></td>
+                        <td>
+                            <?php if ((int)$unit->active === 1): ?>
+                            <span class="badge bg-success">Sim</span>
+                            <?php else: ?>
+                            <span class="badge bg-secondary">Não</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary"
+                                    onclick='editUnit(<?= json_encode([
+                                        "id" => (int)$unit->id,
+                                        "name" => $unit->name,
+                                        "location" => $unit->location,
+                                        "pin" => $unit->pin,
+                                        "open_time" => substr($unit->open_time,0,5),
+                                        "close_time" => substr($unit->close_time,0,5),
+                                        "active" => (int)$unit->active,
+                                        "sort_order" => (int)$unit->sort_order,
+                                    ], JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'>
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <form method="POST" action="/admin/totem/units/<?= (int)$unit->id ?>/delete"
+                                  class="d-inline" onsubmit="return confirm('Excluir esta unidade e todas as suas salas?');">
+                                <?= View::csrf() ?>
+                                <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endforeach; endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <div class="card-footer bg-white">
+        <!-- Clonar salas entre unidades (usa salas existentes como padrão) -->
+        <form method="POST" action="/admin/totem/units/clone-rooms" class="row g-2 align-items-end"
+              onsubmit="return confirm('Copiar todas as salas da unidade de origem para a de destino?');">
+            <?= View::csrf() ?>
+            <div class="col-md-4">
+                <label class="form-label small">Copiar salas de</label>
+                <select class="form-select form-select-sm" name="from_unit" required>
+                    <option value="">Origem...</option>
+                    <?php foreach ($units as $u): ?>
+                    <option value="<?= (int)$u->id ?>"><?= View::escape($u->name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">para</label>
+                <select class="form-select form-select-sm" name="to_unit" required>
+                    <option value="">Destino...</option>
+                    <?php foreach ($units as $u): ?>
+                    <option value="<?= (int)$u->id ?>"><?= View::escape($u->name) ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <button class="btn btn-sm btn-outline-primary"><i class="bi bi-files me-1"></i>Copiar salas</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <!-- Gestão de salas -->
 <div class="card border-0 shadow-sm mb-4">
     <div class="card-header bg-white d-flex justify-content-between align-items-center">
@@ -254,6 +353,7 @@
             <table class="table table-hover mb-0 align-middle">
                 <thead class="table-light">
                     <tr>
+                        <th>Unidade</th>
                         <th>Ordem</th>
                         <th>Ícone</th>
                         <th>Nome</th>
@@ -265,9 +365,10 @@
                 </thead>
                 <tbody>
                     <?php if (empty($rooms)): ?>
-                    <tr><td colspan="7" class="text-center text-muted py-4">Nenhuma sala cadastrada.</td></tr>
+                    <tr><td colspan="8" class="text-center text-muted py-4">Nenhuma sala cadastrada.</td></tr>
                     <?php else: foreach ($rooms as $room): ?>
                     <tr>
+                        <td class="small"><span class="badge bg-light text-dark"><?= View::escape($room->unit_name ?? '-') ?></span></td>
                         <td><?= (int) $room->sort_order ?></td>
                         <td><i class="bi <?= View::escape($room->icon) ?> fs-5"></i></td>
                         <td>
@@ -299,6 +400,7 @@
                             <button class="btn btn-sm btn-outline-primary"
                                     onclick='editRoom(<?= json_encode([
                                         "id" => (int)$room->id,
+                                        "unit_id" => (int)$room->unit_id,
                                         "name" => $room->name,
                                         "description" => $room->description,
                                         "icon" => $room->icon,
@@ -336,6 +438,14 @@
                 </div>
                 <div class="modal-body">
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Unidade <span class="text-danger">*</span></label>
+                            <select class="form-select" name="unit_id" id="roomUnit" required>
+                                <?php foreach ($units as $u): ?>
+                                <option value="<?= (int)$u->id ?>"><?= View::escape($u->name) ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
                         <div class="col-12">
                             <label class="form-label">Nome <span class="text-danger">*</span></label>
                             <input type="text" class="form-control" name="name" id="roomName" required>
@@ -437,7 +547,89 @@
     </div>
 </div>
 
+<!-- Modal de unidade -->
+<div class="modal fade" id="unitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" id="unitForm" action="/admin/totem/units/store">
+                <?= View::csrf() ?>
+                <div class="modal-header">
+                    <h5 class="modal-title" id="unitModalTitle">Nova Unidade</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-7">
+                            <label class="form-label">Nome <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="unitName" required
+                                   placeholder="Ex: Unidade Centro">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label">PIN (4 dígitos) <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="pin" id="unitPin" maxlength="4"
+                                   pattern="\d{4}" inputmode="numeric" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Localização</label>
+                            <input type="text" class="form-control" name="location" id="unitLocation"
+                                   placeholder="Endereço ou referência">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Abertura</label>
+                            <input type="time" class="form-control" name="open_time" id="unitOpen" value="08:00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Fechamento</label>
+                            <input type="time" class="form-control" name="close_time" id="unitClose" value="18:00">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ativa</label>
+                            <select class="form-select" name="active" id="unitActive">
+                                <option value="1">Sim</option>
+                                <option value="0">Não</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Ordem</label>
+                            <input type="number" class="form-control" name="sort_order" id="unitSortOrder" value="0">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 <script>
+function prepareUnitModal() {
+    document.getElementById('unitModalTitle').textContent = 'Nova Unidade';
+    document.getElementById('unitForm').action = '/admin/totem/units/store';
+    document.getElementById('unitName').value = '';
+    document.getElementById('unitPin').value = '';
+    document.getElementById('unitLocation').value = '';
+    document.getElementById('unitOpen').value = '08:00';
+    document.getElementById('unitClose').value = '18:00';
+    document.getElementById('unitActive').value = '1';
+    document.getElementById('unitSortOrder').value = '0';
+}
+
+function editUnit(unit) {
+    document.getElementById('unitModalTitle').textContent = 'Editar Unidade';
+    document.getElementById('unitForm').action = '/admin/totem/units/' + unit.id + '/update';
+    document.getElementById('unitName').value = unit.name || '';
+    document.getElementById('unitPin').value = unit.pin || '';
+    document.getElementById('unitLocation').value = unit.location || '';
+    document.getElementById('unitOpen').value = unit.open_time || '08:00';
+    document.getElementById('unitClose').value = unit.close_time || '18:00';
+    document.getElementById('unitActive').value = String(unit.active);
+    document.getElementById('unitSortOrder').value = unit.sort_order || 0;
+    new bootstrap.Modal(document.getElementById('unitModal')).show();
+}
+
 function prepareRoomModal() {
     document.getElementById('roomModalTitle').textContent = 'Nova Sala';
     document.getElementById('roomForm').action = '/admin/totem/rooms/store';
@@ -456,6 +648,7 @@ function prepareRoomModal() {
 function editRoom(room) {
     document.getElementById('roomModalTitle').textContent = 'Editar Sala';
     document.getElementById('roomForm').action = '/admin/totem/rooms/' + room.id + '/update';
+    if (room.unit_id) document.getElementById('roomUnit').value = String(room.unit_id);
     document.getElementById('roomName').value = room.name || '';
     document.getElementById('roomDescription').value = room.description || '';
     document.getElementById('roomIcon').value = room.icon || 'bi-easel';

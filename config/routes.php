@@ -15,6 +15,7 @@ use App\Controllers\SettingsController;
 use App\Controllers\AdminController;
 use App\Controllers\TotemController;
 use App\Controllers\TotemAdminController;
+use App\Controllers\ClientController;
 
 return [
     // ─── Autenticação ───────────────────────────────────────────
@@ -73,6 +74,9 @@ return [
     'GET  /admin/permissions'         => [AdminController::class, 'permissions'],
     'POST /admin/permissions/sync'    => [AdminController::class, 'syncPermissions'],
 
+    // ─── Clientes (histórico) ───────────────────────────────────
+    'GET  /clients' => [ClientController::class, 'index'],
+
     // ─── Admin: Modo Totem ──────────────────────────────────────
     'GET  /admin/totem'                => [TotemAdminController::class, 'index'],
     'POST /admin/totem/save'           => [TotemAdminController::class, 'save'],
@@ -86,7 +90,14 @@ return [
     'POST /admin/totem/sellers/store'       => [TotemAdminController::class, 'storeSeller'],
     'POST /admin/totem/sellers/{id}/update' => [TotemAdminController::class, 'updateSeller'],
     'POST /admin/totem/sellers/{id}/delete' => [TotemAdminController::class, 'deleteSeller'],
+    'POST /admin/totem/units/store'         => [TotemAdminController::class, 'storeUnit'],
+    'POST /admin/totem/units/{id}/update'   => [TotemAdminController::class, 'updateUnit'],
+    'POST /admin/totem/units/{id}/delete'   => [TotemAdminController::class, 'deleteUnit'],
+    'POST /admin/totem/units/clone-rooms'   => [TotemAdminController::class, 'cloneRooms'],
     'GET  /admin/totem/logs'                => [TotemAdminController::class, 'logs'],
     'POST /admin/totem/logs/{id}/resend'    => [TotemAdminController::class, 'resendLog'],
     'POST /admin/totem/logs/test'           => [TotemAdminController::class, 'testEmail'],
+    'GET  /admin/totem/reservations'        => [TotemAdminController::class, 'reservations'],
+    'GET  /admin/totem/reservations/{id}'   => [TotemAdminController::class, 'reservationInfo'],
+    'GET  /admin/totem/audit'               => [TotemAdminController::class, 'auditLogs'],
 ];

@@ -28,37 +28,48 @@ class NotificationService
      *
      * @return array Resumo do que foi enviado.
      */
-    public function notifyReservation(array $data): array
+    public function notifyReservation(array $data, string $event = 'created'): array
     {
         $reservationId = $data['reservation_id'] ?? null;
+        $room = $data['room'] ?? 'Sala';
+        $customer = $data['customer_name'] ?? '';
         $result = ['email_customer' => false, 'email_seller' => false, 'webhook' => false];
+
+        // Assuntos e chamadas conforme o tipo de evento
+        $subjects = [
+            'created'   => ['cliente' => 'Confirmação da sua visita - ' . $room,
+                            'vendedor' => 'Novo agendamento - ' . $room . ' (' . $customer . ')'],
+            'updated'   => ['cliente' => 'Sua reserva foi atualizada - ' . $room,
+                            'vendedor' => 'Reserva atualizada - ' . $room . ' (' . $customer . ')'],
+            'cancelled' => ['cliente' => 'Sua reserva foi cancelada - ' . $room,
+                            'vendedor' => 'Reserva cancelada - ' . $room . ' (' . $customer . ')'],
+        ];
+        $subj = $subjects[$event] ?? $subjects['created'];
 
         // E-mail para o visitante
         if (!empty($data['customer_email'])) {
-            $subject = 'Confirmação da sua visita - ' . ($data['room'] ?? 'Sala');
             $result['email_customer'] = $this->sendEmail(
                 $data['customer_email'],
-                $data['customer_name'] ?? '',
-                $subject,
-                $this->buildCustomerBody($data),
+                $customer,
+                $subj['cliente'],
+                $this->buildCustomerBody($data, $event),
                 $reservationId
             );
         }
 
         // E-mail para o vendedor
         if (!empty($data['seller_email'])) {
-            $subject = 'Novo agendamento - ' . ($data['room'] ?? 'Sala') . ' (' . ($data['customer_name'] ?? '') . ')';
             $result['email_seller'] = $this->sendEmail(
                 $data['seller_email'],
                 $data['seller_name'] ?? '',
-                $subject,
-                $this->buildSellerBody($data),
+                $subj['vendedor'],
+                $this->buildSellerBody($data, $event),
                 $reservationId
             );
         }
 
         // Webhook
-        $result['webhook'] = $this->sendWebhook($data);
+        $result['webhook'] = $this->sendWebhook($data, $event);
 
         return $result;
     }
@@ -110,22 +121,23 @@ class NotificationService
     /**
      * Dispara o webhook configurado com o payload da reserva e registra o log.
      */
-    public function sendWebhook(array $data): bool
+    public function sendWebhook(array $data, string $event = 'created'): bool
     {
         $reservationId = $data['reservation_id'] ?? null;
+        $eventName = 'reservation.' . $event;
 
         if (!$this->settings->getValue('webhook_enabled', false)) {
-            $this->logs->record('webhook', 'skipped', null, 'reservation.created', 'Webhook desativado', $reservationId);
+            $this->logs->record('webhook', 'skipped', null, $eventName, 'Webhook desativado', $reservationId);
             return false;
         }
 
         $url = (string) $this->settings->getValue('webhook_url', '');
         if ($url === '' || !filter_var($url, FILTER_VALIDATE_URL)) {
-            $this->logs->record('webhook', 'failed', $url, 'reservation.created', 'URL inválida', $reservationId);
+            $this->logs->record('webhook', 'failed', $url, $eventName, 'URL inválida', $reservationId);
             return false;
         }
 
-        $payload = json_encode($this->buildWebhookPayload($data), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $payload = json_encode($this->buildWebhookPayload($data, $event), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
         try {
             $ch = curl_init($url);
@@ -143,15 +155,15 @@ class NotificationService
             curl_close($ch);
 
             if ($code >= 200 && $code < 300) {
-                $this->logs->record('webhook', 'success', $url, 'reservation.created', 'HTTP ' . $code, $reservationId, $payload);
+                $this->logs->record('webhook', 'success', $url, $eventName, 'HTTP ' . $code, $reservationId, $payload);
                 return true;
             }
 
-            $this->logs->record('webhook', 'failed', $url, 'reservation.created', 'HTTP ' . $code . ' ' . $curlErr, $reservationId, $payload);
+            $this->logs->record('webhook', 'failed', $url, $eventName, 'HTTP ' . $code . ' ' . $curlErr, $reservationId, $payload);
             return false;
         } catch (\Throwable $e) {
             error_log('[NotificationService] Falha Webhook: ' . $e->getMessage());
-            $this->logs->record('webhook', 'failed', $url, 'reservation.created', $e->getMessage(), $reservationId, $payload);
+            $this->logs->record('webhook', 'failed', $url, $eventName, $e->getMessage(), $reservationId, $payload);
             return false;
         }
     }
@@ -159,7 +171,7 @@ class NotificationService
     /**
      * Monta o payload completo do webhook, com todos os campos sempre presentes.
      */
-    private function buildWebhookPayload(array $d): array
+    private function buildWebhookPayload(array $d, string $event = 'created'): array
     {
         $str = fn($v) => isset($v) && $v !== '' ? (string) $v : null;
 
@@ -199,14 +211,17 @@ class NotificationService
             }
         }
 
+        $statusMap = ['created' => 'reserved', 'updated' => 'reserved', 'cancelled' => 'cancelled'];
+
         return [
-            'event'     => 'reservation.created',
+            'event'     => 'reservation.' . $event,
             'timestamp' => date('c'),
             'source'    => 'totem',
             'data' => [
                 'reserva' => [
                     'id'     => isset($d['reservation_id']) ? (int) $d['reservation_id'] : null,
-                    'status' => 'reserved',
+                    'status' => $d['status'] ?? ($statusMap[$event] ?? 'reserved'),
+                    'evento' => $event,
                     'origem' => 'totem',
                 ],
                 'agendamento' => [
@@ -443,19 +458,45 @@ class NotificationService
         return str_starts_with($digits, '55') ? $digits : '55' . $digits;
     }
 
-    private function buildCustomerBody(array $d): string
+    private function buildCustomerBody(array $d, string $event = 'created'): string
     {
         $room = htmlspecialchars($d['room'] ?? 'a sala');
-        $intro = "Olá <strong>" . htmlspecialchars($d['customer_name'] ?? '') . "</strong>, sua visita está confirmada! "
-            . "Preparamos <strong>" . $room . "</strong> para você conhecer de perto o que veio ver.";
+        $name = htmlspecialchars($d['customer_name'] ?? '');
+
+        if ($event === 'cancelled') {
+            $intro = "Olá <strong>{$name}</strong>, sua reserva em <strong>{$room}</strong> foi cancelada. "
+                . "Se não foi você que solicitou, entre em contato conosco.";
+            return $this->emailTemplate('Reserva cancelada', $intro, $d, false);
+        }
+        if ($event === 'updated') {
+            $intro = "Olá <strong>{$name}</strong>, sua reserva em <strong>{$room}</strong> foi atualizada. "
+                . "Confira os novos dados abaixo.";
+            return $this->emailTemplate('Reserva atualizada', $intro, $d, true);
+        }
+
+        $intro = "Olá <strong>{$name}</strong>, sua visita está confirmada! "
+            . "Preparamos <strong>{$room}</strong> para você conhecer de perto o que veio ver.";
         return $this->emailTemplate('Sua visita está confirmada!', $intro, $d, true);
     }
 
-    private function buildSellerBody(array $d): string
+    private function buildSellerBody(array $d, string $event = 'created'): string
     {
         $name = htmlspecialchars($d['customer_name'] ?? 'um visitante');
+        $room = htmlspecialchars($d['room'] ?? 'a sala');
+
+        if ($event === 'cancelled') {
+            $intro = "A reserva de <strong>{$name}</strong> em <strong>{$room}</strong> foi cancelada. "
+                . "O horário está novamente disponível.";
+            return $this->emailTemplate('Reserva cancelada', $intro, $d, false);
+        }
+        if ($event === 'updated') {
+            $intro = "A reserva de <strong>{$name}</strong> em <strong>{$room}</strong> foi atualizada. "
+                . "Confira o briefing atualizado abaixo.";
+            return $this->emailTemplate('Reserva atualizada', $intro, $d, true);
+        }
+
         $intro = "Novo agendamento" . (!empty($d['seller_name']) ? " para <strong>" . htmlspecialchars($d['seller_name']) . "</strong>" : '') . ". "
-            . "O visitante <strong>" . $name . "</strong> tem interesse no que será apresentado abaixo. "
+            . "O visitante <strong>{$name}</strong> tem interesse no que será apresentado abaixo. "
             . "Use este briefing para preparar o atendimento e qualificar o interesse.";
         return $this->emailTemplate('Novo agendamento recebido', $intro, $d, true);
     }

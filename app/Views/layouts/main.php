@@ -50,6 +50,9 @@ use App\Core\View;
                     </li>
                     <?php endif; ?>
                     <?php if (Auth::isSuperAdmin()): ?>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/clients"><i class="bi bi-person-lines-fill me-1"></i>Clientes</a>
+                    </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown">
                             <i class="bi bi-shield-lock me-1"></i>Admin

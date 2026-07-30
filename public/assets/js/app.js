@@ -45,6 +45,12 @@ function initCalendar() {
         },
         eventClick: function (info) {
             info.jsEvent.preventDefault();
+            const props = info.event.extendedProps;
+            // Reserva de sala do totem: abre modal com detalhes
+            if (props.tipo) {
+                showCalReservation(info.event, props);
+                return;
+            }
             if (info.event.url) {
                 window.location.href = info.event.url;
             }
@@ -74,6 +80,46 @@ function initCalendar() {
     });
 
     calendar.render();
+}
+
+/**
+ * Abre o modal com os detalhes de uma reserva de sala (evento do totem).
+ */
+function showCalReservation(event, props) {
+    const modalEl = document.getElementById('calResModal');
+    if (!modalEl) return;
+
+    const start = event.start ? formatTime(event.start) : '';
+    const end = event.end ? formatTime(event.end) : '';
+    const dateStr = event.start ? event.start.toLocaleDateString('pt-BR') : '';
+
+    const row = (label, val) => val
+        ? '<tr><td class="text-muted" style="width:150px">' + label + '</td><td><strong>' + escapeHtmlCal(val) + '</strong></td></tr>'
+        : '';
+
+    document.getElementById('calResBody').innerHTML =
+        '<table class="table table-sm">' +
+        row('Sala', props.sala) +
+        row('Data', dateStr) +
+        row('Horário', start + ' – ' + end) +
+        row('Visitante', props.visitante) +
+        row('Telefone', props.telefone) +
+        row('E-mail', props.email) +
+        row('Vendedor', props.vendedor) +
+        row('Interesse', props.interesse) +
+        '</table>';
+
+    new bootstrap.Modal(modalEl).show();
+}
+
+function formatTime(d) {
+    return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+
+function escapeHtmlCal(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 /**

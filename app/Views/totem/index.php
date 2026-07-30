@@ -7,9 +7,17 @@
         <i class="bi bi-easel totem-logo-icon"></i>
         <?php endif; ?>
         <div class="totem-title">Sala de Reservas</div>
+        <?php if (!empty($unit)): ?>
+        <div class="totem-unit"><i class="bi bi-geo-alt-fill me-1"></i><?= View::escape($unit->name) ?></div>
+        <?php endif; ?>
         <div class="totem-subtitle" id="totemDate"></div>
     </div>
     <div class="d-flex align-items-center gap-3">
+        <div class="totem-datepicker">
+            <label for="totemDateInput"><i class="bi bi-calendar3"></i></label>
+            <input type="date" id="totemDateInput" min="<?= date('Y-m-d') ?>" value="<?= date('Y-m-d') ?>">
+            <button type="button" id="totemToday" class="totem-today-btn" title="Hoje">Hoje</button>
+        </div>
         <div class="totem-clock" id="totemClock">--:--</div>
         <a href="/totem/exit" class="btn btn-outline-light btn-sm totem-exit"
            onclick="return confirm('Sair do modo Totem?');">

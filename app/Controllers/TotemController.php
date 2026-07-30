@@ -10,7 +10,9 @@ use App\Models\Room;
 use App\Models\RoomReservation;
 use App\Models\RoomItem;
 use App\Models\Seller;
+use App\Models\Unit;
 use App\Models\ActivityLog;
+use App\Models\ReservationAudit;
 use App\Services\NotificationService;
 
 /**
@@ -39,15 +41,27 @@ class TotemController extends Controller
     }
 
     /**
-     * Verifica se o acesso ao totem já foi liberado via PIN.
+     * Verifica se o acesso ao totem já foi liberado via PIN e retorna a unidade.
      */
-    private function requireTotemSession(): void
+    private function requireTotemSession(): object
     {
         $this->requireTotemEnabled();
-        if (!Session::has('totem_access')) {
+        if (!Session::has('totem_access') || !Session::has('totem_unit_id')) {
             $this->redirect('/totem/pin');
             exit;
         }
+
+        $unitModel = new Unit();
+        $unit = $unitModel->find((int) Session::get('totem_unit_id'));
+        if (!$unit || (int) $unit->active !== 1) {
+            // Unidade removida/desativada: encerra sessão do totem
+            Session::remove('totem_access');
+            Session::remove('totem_unit_id');
+            Session::flash('error', 'Unidade indisponível. Faça o acesso novamente.');
+            $this->redirect('/totem/pin');
+            exit;
+        }
+        return $unit;
     }
 
     /**
@@ -81,12 +95,16 @@ class TotemController extends Controller
         }
 
         $pin = trim((string) $this->input('pin', ''));
-        $expected = (string) $this->settingModel->getValue('totem_pin', '');
 
-        if ($pin !== '' && hash_equals($expected, $pin)) {
+        // Identifica a unidade pelo PIN (cada unidade tem um PIN exclusivo)
+        $unitModel = new Unit();
+        $unit = $pin !== '' ? $unitModel->findByPin($pin) : null;
+
+        if ($unit) {
             Session::set('totem_access', true);
+            Session::set('totem_unit_id', (int) $unit->id);
             $log = new ActivityLog();
-            $log->log('totem.access', 'totem', null, 'Acesso ao modo Totem via PIN');
+            $log->log('totem.access', 'unit', (int) $unit->id, "Acesso ao Totem — unidade {$unit->name}");
             $this->redirect('/totem');
             return;
         }
@@ -101,6 +119,7 @@ class TotemController extends Controller
     public function exit(): void
     {
         Session::remove('totem_access');
+        Session::remove('totem_unit_id');
         $this->redirect('/totem/pin');
     }
 
@@ -109,14 +128,14 @@ class TotemController extends Controller
      */
     public function index(): void
     {
-        $this->requireTotemSession();
-
+        $unit = $this->requireTotemSession();
         $sellerModel = new Seller();
 
         View::render('totem/index', [
-            'config'  => $this->totemConfig(),
+            'config'  => $this->totemConfig($unit),
             'sellers' => $sellerModel->getActive(),
             'logo'    => (string) $this->settingModel->getValue('totem_logo', ''),
+            'unit'    => $unit,
         ], 'totem');
     }
 
@@ -125,15 +144,23 @@ class TotemController extends Controller
      */
     public function rooms(): void
     {
-        $this->requireTotemSession();
+        $unit = $this->requireTotemSession();
+        $config = $this->totemConfig($unit);
 
-        $date = date('Y-m-d');
-        $now  = date('H:i:s');
+        $today = date('Y-m-d');
+        // Data selecionada (padrão: hoje). Não permite datas passadas.
+        $date = (string) $this->query('date', $today);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date < $today) {
+            $date = $today;
+        }
+        $isToday = ($date === $today);
+        $now  = $isToday ? date('H:i:s') : '00:00:00';
 
         $roomModel = new Room();
         $reservationModel = new RoomReservation();
         $itemModel = new RoomItem();
-        $rooms = $roomModel->getTotemRooms();
+        // Somente as salas da unidade deste totem
+        $rooms = $roomModel->getTotemRooms((int) $unit->id);
 
         $data = [];
         foreach ($rooms as $room) {
@@ -177,13 +204,16 @@ class TotemController extends Controller
                     'end'   => substr($r->end_time, 0, 5),
                     'name'  => $r->customer_name,
                 ], $reservations),
-                'slots'       => $this->buildSlots($reservations),
+                'slots'       => $this->buildSlots($reservations, $isToday, $config),
             ];
         }
 
         $this->json([
             'date'       => $date,
+            'today'      => $today,
+            'is_today'   => $isToday,
             'now'        => substr($now, 0, 5),
+            'unit'       => ['id' => (int) $unit->id, 'name' => $unit->name, 'location' => $unit->location],
             'rooms'      => $data,
             'refresh_ms' => ((int) $this->settingModel->getValue('totem_refresh_seconds', 15)) * 1000,
         ]);
@@ -194,7 +224,7 @@ class TotemController extends Controller
      */
     public function reserve(): void
     {
-        $this->requireTotemSession();
+        $unit = $this->requireTotemSession();
 
         if (!$this->validateCsrf()) {
             $this->json(['success' => false, 'message' => 'Token de segurança inválido.'], 400);
@@ -209,8 +239,15 @@ class TotemController extends Controller
         $email     = trim((string) $this->input('customer_email', ''));
         $sellerId  = (int) $this->input('seller_id', 0);
         $interest  = trim((string) $this->input('interest', ''));
+        $date      = trim((string) $this->input('date', date('Y-m-d')));
 
-        $config = $this->totemConfig();
+        $config = $this->totemConfig($unit);
+
+        // Valida a data (não permite datas passadas)
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date < date('Y-m-d')) {
+            $this->json(['success' => false, 'message' => 'Data inválida.'], 422);
+            return;
+        }
 
         // Validações básicas
         if ($roomId <= 0 || $startTime === '' || $name === '') {
@@ -235,15 +272,14 @@ class TotemController extends Controller
             return;
         }
 
-        // Confirma que a sala existe e está disponível no totem
+        // Confirma que a sala existe, está disponível e pertence à unidade do totem
         $roomModel = new Room();
         $room = $roomModel->find($roomId);
-        if (!$room || (int) $room->active !== 1 || (int) $room->show_in_totem !== 1) {
+        if (!$room || (int) $room->active !== 1 || (int) $room->show_in_totem !== 1 || (int) $room->unit_id !== (int) $unit->id) {
             $this->json(['success' => false, 'message' => 'Sala indisponível.'], 404);
             return;
         }
 
-        $date = date('Y-m-d');
         $endTime = date('H:i:s', strtotime($startTime) + $duration * 60);
         $startTime = date('H:i:s', strtotime($startTime));
 
@@ -253,12 +289,14 @@ class TotemController extends Controller
             return;
         }
 
-        // Antecedência mínima e não permitir horário passado
-        $slotStart = strtotime($date . ' ' . $startTime);
-        $minStart  = time() + $config['advance_minutes'] * 60;
-        if ($slotStart < $minStart) {
-            $this->json(['success' => false, 'message' => 'Horário indisponível para reserva.'], 422);
-            return;
+        // Antecedência mínima e não permitir horário passado (só se for hoje)
+        if ($date === date('Y-m-d')) {
+            $slotStart = strtotime($date . ' ' . $startTime);
+            $minStart  = time() + $config['advance_minutes'] * 60;
+            if ($slotStart < $minStart) {
+                $this->json(['success' => false, 'message' => 'Horário indisponível para reserva.'], 422);
+                return;
+            }
         }
 
         // Vendedor selecionado (opcional, mas com dropdown de cadastros)
@@ -303,6 +341,9 @@ class TotemController extends Controller
 
         $log = new ActivityLog();
         $log->log('totem.reserve', 'room_reservation', $id, "Reserva no totem: {$room->name} {$name}");
+
+        // Auditoria da criação
+        (new ReservationAudit())->record($id, 'created', 'room', null, $room->name, 'Totem');
 
         // Itens da sala para compor o briefing da notificação
         $itemModel = new RoomItem();
@@ -426,6 +467,18 @@ class TotemController extends Controller
             $reservationModel->update($id, ['status' => 'cancelled']);
             $log = new ActivityLog();
             $log->log('totem.reservation_cancelled', 'room_reservation', $id, "Reserva cancelada no totem");
+
+            // Auditoria do cancelamento
+            (new ReservationAudit())->record($id, 'cancelled', 'status', 'reserved', 'cancelled', 'Totem');
+
+            // Notifica cancelamento (usa os dados atuais da reserva)
+            try {
+                $notifier = new NotificationService();
+                $notifier->notifyReservation($this->buildReservationNotificationData($r, 'cancelled'), 'cancelled');
+            } catch (\Throwable $e) {
+                error_log('[TotemController] Falha ao notificar cancelamento: ' . $e->getMessage());
+            }
+
             $this->json(['success' => true, 'message' => 'Reserva cancelada.', 'cancelled' => true]);
             return;
         }
@@ -447,6 +500,22 @@ class TotemController extends Controller
             $seller = $sellerModel->find($sellerId);
         }
 
+        // Estado anterior (para auditoria campo a campo)
+        $before = [
+            'customer_name'  => (string) ($r->customer_name ?? ''),
+            'customer_phone' => (string) ($r->customer_phone ?? ''),
+            'customer_email' => (string) ($r->customer_email ?? ''),
+            'seller_name'    => (string) ($r->seller_name ?? ''),
+            'interest'       => (string) ($r->interest ?? ''),
+        ];
+        $after = [
+            'customer_name'  => $name,
+            'customer_phone' => $phone,
+            'customer_email' => $email,
+            'seller_name'    => $seller ? (string) $seller->name : '',
+            'interest'       => $interest,
+        ];
+
         $reservationModel->update($id, [
             'customer_name'  => $name,
             'customer_phone' => $phone !== '' ? $phone : null,
@@ -456,16 +525,77 @@ class TotemController extends Controller
             'interest'       => $interest !== '' ? $interest : null,
         ]);
 
+        // Auditoria: registra cada campo alterado (valor antigo → novo)
+        (new ReservationAudit())->recordChanges(
+            $id,
+            $before,
+            $after,
+            ['customer_name', 'customer_phone', 'customer_email', 'seller_name', 'interest'],
+            'Totem'
+        );
+
         $log = new ActivityLog();
         $log->log('totem.reservation_updated', 'room_reservation', $id, "Reserva editada no totem");
+
+        // Notifica a atualização com os dados já novos
+        $updated = $reservationModel->find($id);
+        try {
+            $notifier = new NotificationService();
+            $notifier->notifyReservation($this->buildReservationNotificationData($updated, 'updated'), 'updated');
+        } catch (\Throwable $e) {
+            error_log('[TotemController] Falha ao notificar atualização: ' . $e->getMessage());
+        }
 
         $this->json(['success' => true, 'message' => 'Reserva atualizada!']);
     }
 
     /**
+     * Monta os dados de notificação a partir de um objeto de reserva.
+     */
+    private function buildReservationNotificationData(object $r, string $event): array
+    {
+        $roomModel = new Room();
+        $room = $roomModel->find((int) $r->room_id);
+
+        $itemModel = new RoomItem();
+        $items = array_map(fn($it) => [
+            'name'        => $it->name,
+            'description' => $it->description,
+        ], $itemModel->getActiveByRoom((int) $r->room_id));
+
+        $sellerEmail = null;
+        $sellerPhone = null;
+        if (!empty($r->seller_id)) {
+            $seller = (new Seller())->find((int) $r->seller_id);
+            if ($seller) {
+                $sellerEmail = $seller->email ?? null;
+                $sellerPhone = $seller->phone ?? null;
+            }
+        }
+
+        return [
+            'reservation_id' => (int) $r->id,
+            'room'           => $room ? $room->name : '',
+            'date'           => date('d/m/Y', strtotime($r->reservation_date)),
+            'start'          => substr($r->start_time, 0, 5),
+            'end'            => substr($r->end_time, 0, 5),
+            'customer_name'  => $r->customer_name,
+            'customer_phone' => $r->customer_phone,
+            'customer_email' => $r->customer_email,
+            'seller_id'      => $r->seller_id ? (int) $r->seller_id : null,
+            'seller_name'    => $r->seller_name,
+            'seller_email'   => $sellerEmail,
+            'seller_phone'   => $sellerPhone,
+            'interest'       => $r->interest ?? null,
+            'status'         => $event === 'cancelled' ? 'cancelled' : ($r->status ?? 'reserved'),
+            'items'          => $items,
+        ];
+    }
+
+    /**
      * Monta as configurações do totem já convertidas.
      */
-    private function totemConfig(): array
+    private function totemConfig(?object $unit = null): array
     {
         $slot = max(5, (int) $this->settingModel->getValue('totem_slot_minutes', 30));
         $min  = max($slot, (int) $this->settingModel->getValue('totem_min_duration', 30));
@@ -479,9 +609,13 @@ class TotemController extends Controller
             $default = $min;
         }
 
+        // Horários: se houver unidade, usa os horários dela; senão, os globais.
+        $openTime  = $unit ? substr($unit->open_time, 0, 5) : (string) $this->settingModel->getValue('totem_open_time', '08:00');
+        $closeTime = $unit ? substr($unit->close_time, 0, 5) : (string) $this->settingModel->getValue('totem_close_time', '18:00');
+
         return [
-            'open_time'        => (string) $this->settingModel->getValue('totem_open_time', '08:00'),
-            'close_time'       => (string) $this->settingModel->getValue('totem_close_time', '18:00'),
+            'open_time'        => $openTime,
+            'close_time'       => $closeTime,
             'slot_minutes'     => $slot,
             'min_duration'     => $min,
             'max_duration'     => $max,
@@ -496,13 +630,14 @@ class TotemController extends Controller
     /**
      * Gera as janelas de horário do dia marcando as ocupadas.
      */
-    private function buildSlots(array $reservations): array
+    private function buildSlots(array $reservations, bool $isToday = true, ?array $config = null): array
     {
-        $config = $this->totemConfig();
+        $config = $config ?? $this->totemConfig();
         $slotSeconds = $config['slot_minutes'] * 60;
         $open  = strtotime($config['open_time']);
         $close = strtotime($config['close_time']);
-        $nowSeconds = strtotime(date('H:i:s'));
+        // Em datas futuras nenhum horário é "passado"
+        $nowSeconds = $isToday ? strtotime(date('H:i:s')) : 0;
 
         // Monta a lista base de janelas com estado (ocupada/passada)
         $slots = [];

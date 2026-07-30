@@ -57,6 +57,7 @@ function initTotemDashboard() {
     let selectedMaxMinutes = 0;
     let checklistMode = false;
     let checkedItems = new Set();
+    let selectedDate = document.getElementById('totemDateInput') ? document.getElementById('totemDateInput').value : '';
     let refreshMs = (config.refresh_seconds || 15) * 1000;
     let roomsData = [];
     let timer = null;
@@ -85,7 +86,8 @@ function initTotemDashboard() {
 
     // Busca dados das salas
     function loadRooms() {
-        fetch('/totem/rooms', { headers: { 'Accept': 'application/json' } })
+        const dateQs = selectedDate ? ('?date=' + encodeURIComponent(selectedDate)) : '';
+        fetch('/totem/rooms' + dateQs, { headers: { 'Accept': 'application/json' } })
             .then(function (r) {
                 return r.text().then(function (text) {
                     if (!r.ok) {
@@ -443,6 +445,7 @@ function initTotemDashboard() {
         body.append('_csrf_token', csrfToken);
         body.append('room_id', document.getElementById('fieldRoomId').value);
         body.append('start_time', document.getElementById('fieldStartTime').value);
+        body.append('date', selectedDate);
         body.append('duration', selectedDuration);
         body.append('seller_id', document.getElementById('fieldSeller').value);
         body.append('interest', document.getElementById('fieldInterest').value.trim());
@@ -577,6 +580,28 @@ function initTotemDashboard() {
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+    }
+
+    // Seletor de data
+    const dateInput = document.getElementById('totemDateInput');
+    if (dateInput) {
+        dateInput.addEventListener('change', function () {
+            selectedDate = this.value;
+            closePanel();
+            clearTimeout(timer);
+            loadRooms();
+        });
+    }
+    const todayBtn = document.getElementById('totemToday');
+    if (todayBtn) {
+        todayBtn.addEventListener('click', function () {
+            const today = new Date().toISOString().slice(0, 10);
+            if (dateInput) dateInput.value = today;
+            selectedDate = today;
+            closePanel();
+            clearTimeout(timer);
+            loadRooms();
+        });
     }
 
     // Teclado virtual para uso no totem (touch)
