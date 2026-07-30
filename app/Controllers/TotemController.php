@@ -71,10 +71,17 @@ class TotemController extends Controller
     {
         $this->requireTotemEnabled();
 
-        if (Session::has('totem_access')) {
-            $this->redirect('/totem');
-            return;
+        // Só redireciona ao dashboard se a sessão estiver completa (acesso + unidade válida).
+        // Caso contrário, limpa qualquer estado órfão para evitar loop de redirecionamento.
+        if (Session::has('totem_access') && Session::has('totem_unit_id')) {
+            $unit = (new Unit())->find((int) Session::get('totem_unit_id'));
+            if ($unit && (int) $unit->active === 1) {
+                $this->redirect('/totem');
+                return;
+            }
         }
+        Session::remove('totem_access');
+        Session::remove('totem_unit_id');
 
         View::render('totem/pin', [
             'logo' => (string) $this->settingModel->getValue('totem_logo', ''),
