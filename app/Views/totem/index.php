@@ -120,14 +120,7 @@
 </div>
 <div class="totem-overlay" id="panelOverlay"></div>
 
-<!-- Teclado virtual (touch) -->
-<div class="totem-vk" id="virtualKeyboard">
-    <div class="totem-vk-bar">
-        <span class="totem-vk-preview" id="vkPreview"></span>
-        <button type="button" class="totem-vk-close" id="vkClose"><i class="bi bi-chevron-down"></i></button>
-    </div>
-    <div class="totem-vk-keys" id="vkKeys"></div>
-</div>
+
 
 <!-- Modal de edição de reserva (protegido por PIN) -->
 <div class="totem-modal" id="editModal">

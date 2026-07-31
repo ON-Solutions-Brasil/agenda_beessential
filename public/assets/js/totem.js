@@ -639,8 +639,7 @@ function initTotemDashboard() {
         });
     }
 
-    // Teclado virtual para uso no totem (touch)
-    initVirtualKeyboard();
+    // Teclado virtual desativado: usa o teclado nativo do dispositivo (mobile/tablet)
 
     // Início
     loadRooms();
