@@ -81,6 +81,7 @@ $navLogo = (new Setting())->getValue('totem_logo', '');
                         <ul class="dropdown-menu dropdown-menu-end">
                             <li><span class="dropdown-item-text text-muted small"><?= View::escape(Auth::userEmail() ?? '') ?></span></li>
                             <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="/account/password"><i class="bi bi-shield-lock me-2"></i>Alterar Senha</a></li>
                             <li><a class="dropdown-item text-danger" href="/logout"><i class="bi bi-box-arrow-right me-2"></i>Sair</a></li>
                         </ul>
                     </li>

@@ -16,6 +16,7 @@ use App\Controllers\AdminController;
 use App\Controllers\TotemController;
 use App\Controllers\TotemAdminController;
 use App\Controllers\ClientController;
+use App\Controllers\AccountController;
 
 return [
     // ─── Autenticação ───────────────────────────────────────────
@@ -76,6 +77,10 @@ return [
 
     // ─── Clientes (histórico) ───────────────────────────────────
     'GET  /clients' => [ClientController::class, 'index'],
+
+    // ─── Conta do usuário ───────────────────────────────────────
+    'GET  /account/password'  => [AccountController::class, 'password'],
+    'POST /account/password'  => [AccountController::class, 'updatePassword'],
 
     // ─── Admin: Modo Totem ──────────────────────────────────────
     'GET  /admin/totem'                => [TotemAdminController::class, 'index'],
