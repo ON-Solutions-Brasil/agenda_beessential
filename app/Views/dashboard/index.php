@@ -245,7 +245,7 @@
                             <div>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge rounded-circle p-1" style="background-color: <?= View::escape($meeting->color ?? '#3788d8') ?>; width: 10px; height: 10px;"></span>
-                                    <strong><?= !empty($meeting->location) ? View::escape($meeting->location) . ' - ' : '' ?><?= View::escape($meeting->title) ?></strong>
+                                    <strong><?= View::escape($meeting->title) ?></strong><?= !empty($meeting->location) ? ' <span class="text-muted fw-normal small">' . View::escape($meeting->location) . '</span>' : '' ?>
                                 </div>
                                 <small class="text-muted"><?= substr($meeting->start_time, 0, 5) ?> - <?= substr($meeting->end_time, 0, 5) ?></small>
                             </div>
@@ -280,7 +280,7 @@
                     <a href="/meetings/<?= $meeting->id ?>" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <strong><?= !empty($meeting->location) ? View::escape($meeting->location) . ' - ' : '' ?><?= View::escape($meeting->title) ?></strong>
+                                <strong><?= View::escape($meeting->title) ?></strong><?= !empty($meeting->location) ? ' <span class="text-muted fw-normal small">' . View::escape($meeting->location) . '</span>' : '' ?>
                                 <div class="small text-muted">
                                     <i class="bi bi-calendar3 me-1"></i><?= date('d/m/Y', strtotime($meeting->meeting_date)) ?>
                                     <i class="bi bi-clock ms-2 me-1"></i><?= substr($meeting->start_time, 0, 5) ?>
