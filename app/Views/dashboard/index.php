@@ -245,8 +245,18 @@
                             <div>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge rounded-circle p-1" style="background-color: <?= View::escape($meeting->color ?? '#3788d8') ?>; width: 10px; height: 10px;"></span>
-                                    <strong><?= View::escape($meeting->title) ?></strong><?= !empty($meeting->location) ? ' <span class="text-muted fw-normal small">' . View::escape($meeting->location) . '</span>' : '' ?>
+                                    <strong><?= View::escape($meeting->title) ?></strong>
                                 </div>
+                                <?php if (!empty($meeting->location) || !empty($meeting->unit_name)): ?>
+                                <div class="text-muted small mt-1">
+                                    <?php if (!empty($meeting->location)): ?>
+                                        <i class="bi bi-door-open me-1"></i>Sala: <?= View::escape($meeting->location) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($meeting->unit_name)): ?>
+                                        <span class="ms-3"><i class="bi bi-building me-1"></i>Unidade: <?= View::escape($meeting->unit_name) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                                 <small class="text-muted"><?= substr($meeting->start_time, 0, 5) ?> - <?= substr($meeting->end_time, 0, 5) ?></small>
                             </div>
                             <?php if ($meeting->meet_link): ?>
@@ -280,7 +290,17 @@
                     <a href="/meetings/<?= $meeting->id ?>" class="list-group-item list-group-item-action">
                         <div class="d-flex justify-content-between align-items-start">
                             <div>
-                                <strong><?= View::escape($meeting->title) ?></strong><?= !empty($meeting->location) ? ' <span class="text-muted fw-normal small">' . View::escape($meeting->location) . '</span>' : '' ?>
+                                <strong><?= View::escape($meeting->title) ?></strong>
+                                <?php if (!empty($meeting->location) || !empty($meeting->unit_name)): ?>
+                                <div class="text-muted small mt-1">
+                                    <?php if (!empty($meeting->location)): ?>
+                                        <i class="bi bi-door-open me-1"></i>Sala: <?= View::escape($meeting->location) ?>
+                                    <?php endif; ?>
+                                    <?php if (!empty($meeting->unit_name)): ?>
+                                        <span class="ms-3"><i class="bi bi-building me-1"></i>Unidade: <?= View::escape($meeting->unit_name) ?></span>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
                                 <div class="small text-muted">
                                     <i class="bi bi-calendar3 me-1"></i><?= date('d/m/Y', strtotime($meeting->meeting_date)) ?>
                                     <i class="bi bi-clock ms-2 me-1"></i><?= substr($meeting->start_time, 0, 5) ?>

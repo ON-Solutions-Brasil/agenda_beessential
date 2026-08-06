@@ -39,9 +39,11 @@ class Meeting extends Model
      */
     public function getByDate(string $date): array
     {
-        $sql = "SELECT m.*, u.name as organizer_name
+        $sql = "SELECT m.*, u.name as organizer_name, rm.name as room_name, un.name as unit_name
                 FROM {$this->table} m
                 INNER JOIN users u ON m.organizer_id = u.id
+                LEFT JOIN rooms rm ON rm.name = m.location
+                LEFT JOIN units un ON rm.unit_id = un.id
                 WHERE m.meeting_date = :date AND m.status != 'cancelled'
                 ORDER BY m.start_time ASC";
         return $this->db()->query($sql, ['date' => $date]);
@@ -152,9 +154,11 @@ class Meeting extends Model
      */
     public function getUpcoming(int $limit = 5, ?int $userId = null): array
     {
-        $sql = "SELECT DISTINCT m.*, u.name as organizer_name
+        $sql = "SELECT DISTINCT m.*, u.name as organizer_name, rm.name as room_name, un.name as unit_name
                 FROM {$this->table} m
                 INNER JOIN users u ON m.organizer_id = u.id
+                LEFT JOIN rooms rm ON rm.name = m.location
+                LEFT JOIN units un ON rm.unit_id = un.id
                 LEFT JOIN meeting_participants mp ON mp.meeting_id = m.id
                 WHERE (m.meeting_date > CURDATE() OR (m.meeting_date = CURDATE() AND m.start_time >= CURTIME()))
                 AND m.status IN ('scheduled', 'confirmed')";
