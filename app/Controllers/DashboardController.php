@@ -6,6 +6,7 @@ use App\Core\Controller;
 use App\Core\Auth;
 use App\Models\Meeting;
 use App\Models\User;
+use App\Models\Room;
 use App\Models\RoomReservation;
 
 class DashboardController extends Controller
@@ -22,6 +23,37 @@ class DashboardController extends Controller
 
         // Reuniões de hoje
         $todayMeetings = $meetingModel->getByDate(date('Y-m-d'));
+
+        // Associar nome da unidade às reuniões com base na sala (location)
+        $roomModel = new Room();
+        $roomsWithUnit = $roomModel->allWithUnit();
+        $roomUnitMap = [];
+        foreach ($roomsWithUnit as $room) {
+            $roomUnitMap[mb_strtolower(trim($room->name))] = $room->unit_name ?? '';
+        }
+
+        // Função auxiliar para encontrar a unidade da sala
+        $findUnitName = function (string $location) use ($roomUnitMap): string {
+            $locationLower = mb_strtolower(trim($location));
+            // Busca exata
+            if (isset($roomUnitMap[$locationLower])) {
+                return $roomUnitMap[$locationLower];
+            }
+            // Busca parcial: location contém o nome da sala ou vice-versa
+            foreach ($roomUnitMap as $roomName => $unitName) {
+                if (str_contains($locationLower, $roomName) || str_contains($roomName, $locationLower)) {
+                    return $unitName;
+                }
+            }
+            return '';
+        };
+
+        foreach ($todayMeetings as $meeting) {
+            $meeting->unit_name = !empty($meeting->location) ? $findUnitName($meeting->location) : '';
+        }
+        foreach ($upcomingMeetings as $meeting) {
+            $meeting->unit_name = !empty($meeting->location) ? $findUnitName($meeting->location) : '';
+        }
 
         // Estatísticas gerais (para admin)
         $stats = [];
